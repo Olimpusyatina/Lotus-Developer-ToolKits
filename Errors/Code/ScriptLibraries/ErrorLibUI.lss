@@ -1,0 +1,55 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+%REM
+	Library ErrorLibUI
+	Created Jan 30, 2019 by Alexandr S. Olympiev/OTTO/RU
+	Description: Comments for Library
+%END REM
+Option Public
+Option Declare
+Use "ErrorLib"
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Sub Initialize
+Declare Sub createDocument(form As String)
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+Private Const DesignElem = {ErrorLibUI}
+Private nLine As String
+
+'++LotusScript Development Environment:2:2:Initialize:2:10
+
+Sub Initialize
+	On Error GoTo ErrH
+	nLine = Chr(10) & Chr(13)
+
+
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+End Sub
+
+
+'++LotusScript Development Environment:2:2:createDocument:5:8
+' Library ErrorLibUI -> Sub createDocument
+' 
+' DCS-Olympiev Jan 30, 2019
+' *********************************************************************************
+Sub createDocument(form As String)
+	On Error GoTo ErrH
+
+	Dim doc As NotesDocument
+	Dim s As New NotesSession
+	Dim ws As New NotesUIWorkspace
+	
+	Set doc = s.CurrentDatabase.CreateDocument
+	Call doc.ReplaceItemValue("form", form)
+	Call doc.ReplaceItemValue("UNID", doc.UniversalID)
+	Call ws.EditDocument(True, doc)
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem &  " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+End Sub

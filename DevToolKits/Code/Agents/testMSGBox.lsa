@@ -1,0 +1,100 @@
+<?xml version='1.0' encoding='utf-8'?>
+<note class='filter' xmlns='http://www.lotus.com/dxl' version='9.0' maintenanceversion='1.0'
+ replicaid='43258466001AF246'>
+<noteinfo noteid='2a6' unid='50CD02CDD424ABED432584660034B76A' sequence='7'>
+<created><datetime>20190830T123548,26+03</datetime></created>
+<modified><datetime>20190830T123646,56+03</datetime></modified>
+<revised><datetime>20190830T123646,55+03</datetime></revised>
+<lastaccessed><datetime>20190830T123646,56+03</datetime></lastaccessed>
+<addedtofile><datetime>20190830T123548,28+03</datetime></addedtofile></noteinfo>
+<updatedby><name>CN=Alexandr S. Olympiev/O=OTTO/C=RU</name></updatedby>
+<wassignedby><name>CN=Alexandr S. Olympiev/O=OTTO/C=RU</name></wassignedby>
+<item name='$TITLE' sign='true'><text>testMSGBox</text></item>
+<item name='$AssistType' sign='true'><number>65413</number></item>
+<item name='$AssistLastRun' sign='true'>
+<rawitemdata type='400'>
+AAAAAAAAAAA=
+</rawitemdata></item>
+<item name='$AssistDocCount' sign='true'><number>0</number></item>
+<item name='$FlagsExt' sign='true'><text/></item>
+<item name='$AssistFlags' sign='true'><text>Es</text></item>
+<item name='$MachineName' sign='true'><text>CN=Alexandr S. Olympiev/O=OTTO/C=RU</text></item>
+<item name='$AssistTrigger'><text>1</text></item>
+<item name='$AssistInfo' sign='true'>
+<rawitemdata type='11'>
+AQABAAAAAgABAKBlRQDAV34AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+</rawitemdata></item>
+<item name='$AssistQuery' sign='true'>
+<rawitemdata type='f'>
+gQYAAAAA
+</rawitemdata></item>
+<item name='$Restricted' sign='true'><number>1</number></item>
+<item name='$Flags'><text>fL3S</text></item>
+<item name='$DesignerVersion'><text>8.5.3</text></item>
+<item name='$AssistRunInfo' summary='true'>
+<rawitemdata type='3'>
+BgABAAAACAC2AgAAAAAAAAUAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAKs40AGaEJUNG8hoAZoQlQwAAAAAAAAAAAAAAAAAAAAAAAAAAqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+qqqqqqqqqqqqqqqqqqqqqqqq
+</rawitemdata></item>
+<item name='$AssistAction' sign='true'>
+<rawitemdata type='10'>
+gQKF/8kCAAAAAL0CAAAnKytMb3R1c1NjcmlwdCBEZXZlbG9wbWVudCBFbnZpcm9ubWVudDoyOjU6
+KE9wdGlvbnMpOjA6NzQKJyoqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioq
+KioqCidBZ2VudCB0ZXN0TVNHQm94CidPbGltcHVzOiBBdWcgMzAsIDIwMTkKJyoqKioqKioqKioq
+KioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqCk9wdGlvbiBQdWJsaWMKT3B0aW9uIERl
+Y2xhcmUKCicrK0xvdHVzU2NyaXB0IERldmVsb3BtZW50IEVudmlyb25tZW50OjI6NTooRm9yd2Fy
+ZCk6MDoxCkRlY2xhcmUgU3ViIEluaXRpYWxpemUKCicrK0xvdHVzU2NyaXB0IERldmVsb3BtZW50
+IEVudmlyb25tZW50OjI6NTooRGVjbGFyYXRpb25zKTowOjEwClByaXZhdGUgbkxpbmUgQXMgU3Ry
+aW5nClByaXZhdGUgQ29uc3QgZGVzaWduRWxlbSA9ICJ0ZXN0TVNHQm94IgoKJysrTG90dXNTY3Jp
+cHQgRGV2ZWxvcG1lbnQgRW52aXJvbm1lbnQ6MjoyOkluaXRpYWxpemU6MjoxMAoKU3ViIEluaXRp
+YWxpemUKCU9uIEVycm9yIEdvVG8gRXJySAoJbkxpbmUgPSBDaHIoMTApICYgQ2hyKDEzKQoKCU1z
+Z0JveCAxMjMKCglHb1RvIEVuZEgKRXJySDoKCUVycm9yIEVyciwgRGVzaWduRWxlbSAmICIgLT4g
+IiAmIEdldFRocmVhZEluZm8oMSkgJiAiLCBjLiAiICYgQ1N0cihFckwpICYgbkxpbmUgJiBFcnJv
+ciQKCVJlc3VtZSBlbmRICkVuZEg6CkVuZCBTdWIKACI=
+</rawitemdata></item>
+<item name='$AssistAction_Ex' sign='true'>
+<rawitemdata type='14'>
+gQKF/+kEAAAAAN0EAAABAAACTFNPQgQAFAhlbgAABAAFAF0ABAAAAPAAMAE4AAAAAAAAAAAAAAAA
+ACAA//8UADQADAGUAAAAAAAAAAAAAwAAAAQAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAQA
+OAA4AAAAAAAAAAAAGAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAFAExvdHVzIFByb2R1Y3QAAABWMC4w
+AAAAAAAAAAAAAAAAAAAAAAQAAABdAAAAAAAAAPAAAAAwAQAAAAAAAAAAAAABAAAAAAAAAAEAAAAA
+AAAAAQAAAAAAAAAAAAAABAAAAFczMkklAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAIAAgAAAAAADABAAADADQBAAAAAFAABwBBADIANQAzADQAMQA4AAAA
+aAADAE4ARQBXAAAAfAAGAEQARQBMAEUAVABFAAAAAADcAAoASQBOAEkAVABJAEEATABJAFoARQAA
+AAAAhAAJAFQARQBSAE0ASQBOAEEAVABFAAAA//8GAE8AQgBKAEUAQwBUAAAAAACwAAAAAAAAAP//
+BQBOAEwASQBOAEUAAADMAAoARABFAFMASQBHAE4ARQBMAEUATQAAAAAA/AAKAHQAZQBzAHQATQBT
+AEcAQgBvAHgAAAAAAOwABABFAFIAUgBIAAAAAAD//wQARQBOAEQASAAAAAAA//8EACAALQA+ACAA
+AAAAAP//BQAsACAAYwAuACAAAAD//w4AdABlAHMAdABNAFMARwBCAG8AeAAgAC0APgAgAAAAAAAN
+AAgAAAAAAPAAAAAFAPQAAAAAAHGJF1UDAAAAGAAAAIgABgAAAAAAGQAZAAQAAAA4AAAAmAAGAAAA
+AAC0AAAAAAAAAAAAAAAAAAAACAAAAAAAAAA4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAwAAABAAAAACAAAA
+0ADgAAAAAADgAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0ADQAAAAAAAN
+AAgA4AAAANAAAAA0ABkADQAIAAAAAADgAAAAVgAZAAQAYQAAAAAAHQAAGhMACwAAAAAJOiUAGhQA
+WwQAjwoDBkKTjw0DBkKTv5ulGhYAjnubgIAGBxoYADoiABoZABoaABR9EAGGBnK/fQABvxWbv0cE
+AL8WvxEaGwAPAAAaHAAaHQAdCwAIAAAAAAAEAAAAAgAAABEAFAAAAAAA//8BAAMACQAAAAwAOAAQ
+AAoAAADd
+</rawitemdata></item>
+<item name='$AssistVersion'><datetime>20190830T123646,53+03</datetime></item></note>
+
