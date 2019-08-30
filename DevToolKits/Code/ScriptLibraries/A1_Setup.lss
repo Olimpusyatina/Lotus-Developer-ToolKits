@@ -1,0 +1,1146 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+Option Public
+Option Declare
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Public Class ErrorH
+Declare Public Class collection
+Declare Public Class AgentEventLog As ErrorH
+Declare Sub Initialize
+Declare Function AttachFile(param As NotesDocument, mask As String, BodyName As String)	As boolean
+Declare Function NeedUISave(param As NotesDocument) As Boolean
+Declare Function FileExists (strPath As String) As Boolean
+Declare Function A1_ReplaceSubString(searchStr As String, oldStr As String, newStr As String) As String
+Declare Function ExtractFile(param As NotesDocument, BodyName As String, TargetPath As String) As Boolean
+Declare Sub RefreshRT(pUIDoc As NotesUIDocument)
+Declare Function A1_SendMail(sendFrom As Variant, subject As String, sendTo As Variant, copyTo As Variant, blindCopyTo As Variant, body As Variant) As Boolean
+Declare Function GetNotesTemp(Platform As String) As String
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+Private Const libName = "(A1)"
+Dim k As Variant
+Private nLine As String
+
+Declare Function w32_OSGetSystemTempDirectory Lib "nnotes" Alias "OSGetSystemTempDirectory" ( ByVal S As String) As Integer
+Declare Function mac_OSGetSystemTempDirectory Lib "NotesLib" Alias "OSGetSystemTempDirectory" ( ByVal S As String) As Integer
+Declare Function linux_OSGetSystemTempDirectory Lib "libnotes.so" Alias "OSGetSystemTempDirectory" ( ByVal S As String) As Integer
+
+Public Class ErrorH
+	Private Number As Long
+	Private Description As String
+	Private Init As Boolean
+	Private onServerErr As Boolean
+	
+	Public Sub New()
+		Number = -1
+		Description = ""
+		init = False
+		onServerErr = false
+	End Sub
+	
+	Public Sub Initialize (errNum, errDesc As Variant)
+		If errNum = 0 Then
+			Number = -1
+			Description = ""
+			Init = False
+		Else
+			Number = errNum
+			Description = CStr(errDesc)
+			Init = True
+		End If
+	End Sub
+	
+	Public Property Set OnServer As Boolean
+		onServerErr = OnServer
+	End Property
+	
+	Public Property Get OnServer As Boolean
+		OnServer = onServerErr
+	End Property
+
+	Public Property Set Desc As String
+		Description = Desc
+	End Property
+	
+	Public Property Get Desc As String
+		Desc = Description
+	End Property
+	
+	Public Sub Log()
+		On Error GoTo Handler
+		Dim ss As New NotesSession
+		Dim tmp As Variant
+		
+		If Me.Init Then
+			' защита от глупости
+			If (me.OnServer=false) And (ss.Isonserver=true) Then me.OnServer = true
+			If Not me.onServer Then
+				MsgBox Me.Description,16,"Error"
+			End If
+			Dim aLog As New NotesLog(ss.Currentdatabase.Filepath)
+			Call aLog.OpenNotesLog(ss.CurrentDatabase.Server, "alog.nsf")
+			tmp = split(Me.Description,Chr(10) & Chr(13))
+			Call aLog.LogError(Me.Number, Implode(tmp,"~"))
+			Set aLog = Nothing
+		End If
+		
+		Exit Sub
+Handler:
+		Print "Невозможно записать ошибку: " & "(" & Me.Number & ") " & Me.Description, 16, "Системная ошибка"
+		Resume endH
+endH:
+	End Sub
+	
+	Public Sub Mail(sendTo As Variant, lineColour As Variant)
+		On Error GoTo Handler
+		If Me.Init Then
+			Dim ss As New NotesSession
+			Dim db As New NotesDatabase(ss.Currentdatabase.Server, "mail.box")
+			Dim mdoc As NotesDocument
+			Set mdoc = db.Createdocument()
+			Call mdoc.Replaceitemvalue("Form", "Memo")
+			Call mdoc.Replaceitemvalue("From", ss.UserName)
+			Call mdoc.Replaceitemvalue("SendTo", sendTo)
+			If IsArray(lineColour) Then If UBound(lineColour) = 5 Then Call mdoc.Replaceitemvalue("$Sender1", lineColour)
+			Call mdoc.Replaceitemvalue("Body", "Memo")
+			Call mdoc.save(True, False)
+		End If
+		
+		Exit Sub
+Handler:
+		Call Me.Log()
+		Resume endH
+endH:
+	End Sub
+End Class
+
+
+%REM
+	Class collection
+	Description: Comments for Class
+	On This Time For NotesDocument and Simple Variable (String, Long and etc)
+%END REM
+Public Class collection
+	Private DbList List As Variant
+	Private Elements() As Variant
+	Private ElementsUID() As Variant
+	Private Order() As Long
+	Private Count As Long
+	Private FldSort As String
+	Private TypeSort As Integer'(1-UP, 2 - DOWN, 0 - Not Sorting)
+	Private Nth As Long
+	Public Function SaveCollection(Force As Boolean, isResp As Boolean, makeUnread As Boolean) As Boolean
+		' isResp = True, then True
+		' isResp = false, then doc.IsResponse
+		On Error GoTo handler
+		Const FuncName = {Function "collection.SaveCollection" }
+		Dim ErrStr As String
+		
+		Dim doc As NotesDocument
+		
+		SaveCollection = False
+		
+		Set doc = me.GetFirst()
+		If isResp Then
+			While Not doc Is Nothing
+				Call doc.Save(Force, True, makeUnread)
+				Set doc = me.GetNext()
+			Wend
+		Else
+			While Not doc Is Nothing
+				Call doc.Save(Force, doc.Isresponse, makeUnread)
+				Set doc = me.GetNext()
+			Wend
+		End If
+		SaveCollection = True
+		
+		GoTo endh
+		
+handler:
+		ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+		Error Err,ErrStr
+endh:
+	End Function
+	Function GetDBFromCollection (db As Variant) As NotesDatabase
+		' Проверяет наличие бд в коллекции. Если есть, то возвращает объект из коллекции
+		' Если нет, то добавляет в коллекцию и возвращает тот же объект
+		On Error GoTo handler
+		Const FuncName = {Function "collection.IsInDBList" }
+		Dim ErrStr As String
+		
+		If IsElement(dbList(db.Filepath)) Then
+			Set GetDBFromCollection = dbList(db.Filepath)
+		Else
+			Set dbList(db.Filepath) = db
+			Set GetDBFromCollection = dbList(db.Filepath)
+		End If
+		
+		GoTo endh
+		
+handler:
+		ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+		Error Err,ErrStr
+endh:
+	End Function
+	Function RegetDocument (doc As Variant) As Variant
+		' Переполучение элемента из коллекции
+		On Error GoTo handler
+		Const FuncName = {Function "collection.RegetDocument" }
+		Dim ErrStr As String
+		
+		Dim colDoc As NotesDocument
+		Dim unid As String
+		If TypeName(doc) = "NOTESDOCUMENT" Then
+			unid = doc.Universalid
+		ElseIf TypeName(doc) = "STRING" Then
+			unid = doc
+		End If
+		Set colDoc = Me.GetFirst()
+		Do While Not colDoc Is Nothing
+			If colDoc.Universalid = unid Then Exit Do 
+			Set colDoc = Me.GetNext()	
+		Loop
+		
+		Set RegetDocument = colDoc
+		
+		GoTo endh
+handler:
+		ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+		Error Err,ErrStr
+endh:
+	End Function
+	%REM
+		Sub New
+		Description: Comments for Sub
+	%END REM
+	Public Sub New()
+		Call Me.setEmptyCollection()
+	End Sub
+	%REM
+		Sub New
+		Description: Comments for Sub
+	%END REM
+	Public Sub initialize(var As Variant)
+		On Error GoTo handler
+		
+		Dim sErr As New ErrorH
+		Dim fName, errString As String
+		fName = "collection.Initialize"
+		
+		Dim i As Integer
+		Dim dif As Integer
+		
+		Select Case UCase(TypeName(var))
+		Case "NOTESDOCUMENTCOLLECTION":
+			If var Is Nothing Then Exit Sub
+			Me.Count = var.Count
+			If Me.Count > 0 Then
+				ReDim Elements(1 To Me.Count)
+				ReDim ElementsUID(1 To Me.Count)
+				For i = 1 To Me.Count
+					Set Elements(i) = var.GetNthDocument(i)
+					ElementsUID(i) = Elements(i).UniversalID
+				Next
+			End If
+		Case "NOTESDOCUMENT"
+			Me.Count = 1
+			ReDim Elements(1 To Me.Count)
+			ReDim ElementsUID(1 To Me.Count)
+			Set Elements(i) = var
+			ElementsUID(i) = var.UniversalID
+		Case "OBJECT"
+			If IsArray(var) Then
+				dif = 1 - LBound(var)
+				Me.Count = UBound(var)+ dif
+				If Me.Count > 0 Then
+					ReDim Elements(1 To Me.Count)
+					For i = 1 To Me.Count
+						Set Elements(i) = var(i - dif)
+					Next
+				End If
+			Else
+				Me.Count = 1
+				ReDim Elements(1 To Me.Count)
+				Set Elements(i) = var
+			End If
+		Case Else:
+			If IsArray(var) Then
+				dif = 1 - LBound(var)
+				Me.Count = UBound(var)+ dif
+				If Me.Count > 0 Then
+					ReDim Elements(1 To Me.Count)
+					For i = 1 To Me.Count
+						Set Elements(i) = var(i - dif)
+					Next
+				End If
+			Else
+				Me.Count = 1
+				ReDim Elements(1 To Me.Count)
+				Elements(Me.Count) = var
+			End If
+		End Select
+		
+		Call Me.setOrder()
+		Call Me.setSort(0, "")
+		nth = 1
+
+		GoTo endh
+handler:
+		errString = libName & "->" & fName & ", " & "стр." & Erl & ", " & Error$
+		Call sErr.Initialize(Err, errString)
+		Call sErr.Log
+		Resume endh
+endh:
+	End Sub
+	
+	%REM
+		Sub Sort
+		Description: Comments for Sub
+	%END REM
+	Public Sub sort(ud As Integer, fld As String)
+		On Error GoTo eH
+		
+		Dim sErr As New ErrorH
+		Dim fName, errString As String
+		fName = "collection.Sort"
+		
+		Dim arrTemp() As Variant
+		Dim i As Integer
+		Dim vP As Variant, vL As Variant
+		Dim n As Boolean
+		
+		If Not IsNumeric(ud) Then Error 5000, "Некорректное направление сортировки"
+		If ud < 0 And ud > 2 Then Error 5000, "Некорректное направление сортировки"
+		Call Me.setSort(ud, fld)
+		
+		If Me.Count = 0 Then GoTo fn
+		If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+			If Not IsEmpty(ElementsUID()) Then
+				If ud = 0 Then
+					vP = Me.Elements
+					vL = Me.ElementsUID
+					For i = LBound(Me.Order()) To UBound(Me.Order())
+						Set Me.Elements(Me.Order(i)) = vP(i)
+						Me.ElementsUID(Me.Order(i)) = vL(i)
+					Next
+					Call Me.setOrder()
+				Else
+					ReDim arrTemp(LBound(Me.Elements) To UBound(Me.Elements))
+					For i = LBound(Me.Elements) To UBound(Me.Elements)
+						arrTemp(i) = Me.Elements(i).GetItemValue(Me.fldSort)(0)
+					Next
+				
+					n = True
+					While n
+						For i = UBound(Me.Elements) To LBound(Me.Elements) Step -1
+							If i = LBound(Me.Elements)Then Exit For
+							vL = arrTemp(i)
+							vP = arrTemp(i - 1)
+							If (ud = 1 And vP > vL) Or (ud = 2 And vP < vL) Then
+								arrTemp(i) = vP
+								arrTemp(i - 1) = vL
+								
+								Set vL = Me.Elements(i)
+								Set vP = Me.Elements(i - 1)
+								Set Me.Elements(i) = vP
+								Set Me.Elements(i - 1) = vL
+								
+								vL = Me.ElementsUID(i)
+								vP = Me.ElementsUID(i - 1)
+								Me.ElementsUID(i) = vP
+								Me.ElementsUID(i - 1) = vL
+								
+								vL = Me.Order(i)
+								vP = Me.Order(i - 1)
+								Me.Order(i) = vP
+								Me.Order(i - 1) = vL
+							End If
+						Next
+						n = False
+						For i = UBound(Me.Elements) To LBound(Me.Elements) Step -1
+							If i = LBound(Me.Elements)Then Exit For
+							vL = arrTemp(i)
+							vP = arrTemp(i - 1)
+							If (ud = 1 And vP > vL) Or (ud = 2 And vP < vL) Then n = True
+						Next
+					Wend
+				
+				End If
+			End If
+		Else
+			If ud = 0 Then
+				vP = Me.Elements
+				For i = LBound(Me.Order()) To UBound(Me.Order())
+					Me.Elements(Me.Order(i)) = vP(i)
+				Next
+				Call Me.setOrder()
+			Else
+				ReDim arrTemp(LBound(Me.Elements) To UBound(Me.Elements))
+				For i = LBound(Me.Elements) To UBound(Me.Elements)
+					arrTemp(i) = Me.Elements(i)
+				Next
+			
+				n = True
+				While n
+					For i = UBound(Me.Elements) To LBound(Me.Elements) Step -1
+						If i = LBound(Me.Elements)Then Exit For
+						vL = Me.Elements(i)
+						vP = Me.Elements(i - 1)
+						If (ud = 1 And vP > vL) Or (ud = 2 And vP < vL) Then
+							Me.Elements(i) = vP
+							Me.Elements(i - 1) = vL
+								
+							vL = Me.Order(i)
+							vP = Me.Order(i - 1)
+							Me.Order(i) = vP
+							Me.Order(i - 1) = vL
+						End If
+					Next
+					n = False
+					For i = UBound(Me.Elements) To LBound(Me.Elements) Step -1
+						If i = LBound(Me.Elements)Then Exit For
+						vL = Elements(i)
+						vP = Elements(i - 1)
+						If (ud = 1 And vP > vL) Or (ud = 2 And vP < vL) Then n = True
+					Next
+				Wend
+			End If
+		End If
+		
+		GoTo fn
+eH:
+		errString = libName & "->" & fName & ", " & "стр." & Erl & ", " & Error$
+		Call sErr.Initialize(Err, errString)
+		Call sErr.Log
+		Resume fn
+fn:
+	End Sub
+	
+	%REM
+		Functions set(get)Sort
+		Description: Comments for Function
+	%END REM
+	Public Function setSort(ud As Integer, fld As String) As Boolean
+		setSort = False
+		Me.typeSort = ud
+		me.fldSort = fld
+		setSort = True
+	End Function
+	
+	Public Function getTypeSort() As Integer
+		getTypeSort = Me.typeSort
+	End Function
+	
+	Public Function getFldSort() As String
+		getFldSort = me.fldSort
+	End Function
+	
+	%REM
+		Function isSorted
+		Description: Comments for Function
+	%END REM
+	Public Function isSorted() As Boolean
+		If Me.typeSort = 1 Or Me.typeSort = 2 Then
+			isSorted = True
+		Else
+			isSorted = False
+		End If
+	End Function
+	%REM
+		Sub setOrder
+		Description: Comments for Sub
+	%END REM
+	Private Sub setOrder()
+		On Error GoTo eH
+		
+		Dim sErr As New ErrorH
+		Dim fName, errString As String
+		fName = "collection.setOrder"
+		
+		Dim i As Long
+		If Me.Count > 0 Then
+			ReDim Me.Order(1 To Me.Count)
+			For i = LBound(Me.Elements()) To UBound(Me.Elements())
+				Me.Order(i) = CLng(i)
+			Next
+		End If
+
+		GoTo fn
+eH:
+		errString = libName & "->" & fName & ", " & "стр." & Erl & ", " & Error$
+		Call sErr.Initialize(Err, errString)
+		Call sErr.Log
+		Resume fn
+fn:
+	End Sub
+	%REM
+		Functions get(insert, append, remove)Element
+		Description: Comments for Sub
+	%END REM
+	Public Function getElement(n As Long) As Variant
+		On Error GoTo eH
+		
+		Dim sErr As New ErrorH
+		Dim fName, errString As String
+		fName = "collection.getElement"
+		
+		If n < LBound(Me.Elements()) Or n > UBound(Me.Elements)Then
+			If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+				Set getElement = Nothing
+			Else
+				getElement = Null
+			End If
+		Else
+			If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+				Set getElement = Me.Elements(n)
+			Else
+				getElement = Me.Elements(n)
+			End If
+		End If
+		
+		GoTo fn
+eH:
+		errString = libName & "->" & fName & ", " & "стр." & Erl & ", " & Error$
+		Call sErr.Initialize(Err, errString)
+		Call sErr.Log
+		Resume fn
+fn:
+	End Function
+	
+	Public Sub insertElement(el As Variant, n As Long)
+		On Error GoTo eH
+		
+		Dim sErr As New ErrorH
+		Dim fName, errString As String
+		fName = "collection.insertElement"
+		
+		Dim i As Long
+		
+		If TypeName(El) <> TypeName(Me.Elements(LBound(Me.Elements))) Then
+			Error 5000, "Коллекция и добавляемый элемент имеют разный тип данных"
+		End If
+		
+		If n < LBound(Me.Elements()) Or n > UBound(Me.Elements)Then
+			Call Me.appendElement(el)
+		End If
+		
+		ReDim Preserve Me.Elements(1 To UBound(Me.Elements) + 1)
+		If TypeName(El) = "NOTESDOCUMENT" Then
+			ReDim Preserve Me.ElementsUID(1 To UBound(Me.Elements) + 1)
+		End If
+		
+		For i = UBound(Me.Elements()) To LBound(Me.Elements) Step -1
+			If i > n Then
+				If TypeName(El) = "NOTESDOCUMENT" Then
+					Set Me.Elements(i) = Me.Elements(i-1)
+					Me.ElementsUID(i) = Me.ElementsUID(i-1)
+				Else
+					Me.Elements(i) = Me.Elements(i-1)
+				End If
+			ElseIf i = n Then
+				If TypeName(El) = "NOTESDOCUMENT" Then
+					Set Me.Elements(i) = El
+					Me.ElementsUID(i) = El.UniversalID
+				Else
+					Me.Elements(i) = El
+				End If
+			End If
+		Next
+		
+		Call Me.setOrder()
+		Call Me.setNth(n)
+
+		GoTo fn
+eH:
+		errString = libName & "->" & fName & ", " & "стр." & Erl & ", " & Error$
+		Call sErr.Initialize(Err, errString)
+		Call sErr.Log
+		Resume fn
+fn:
+	End Sub
+	
+	Public Sub appendElement(el As Variant)
+		On Error GoTo eH
+		
+		Dim sErr As New ErrorH
+		Dim fName, errString As String
+		fName = "collection.appendElement"
+		
+		Dim i As Long
+		
+		If TypeName(El) <> TypeName(Me.Elements(LBound(Me.Elements))) Then
+			Error 5000, "Коллекция и добавляемый элемент имеют разный тип данных"
+		End If
+		
+		ReDim Preserve Me.Elements(1 To UBound(Me.Elements) + 1)
+		If TypeName(El) = "NOTESDOCUMENT" Then
+			ReDim Preserve Me.ElementsUID(1 To UBound(Me.Elements) + 1)
+		End If
+		
+		If TypeName(El) = "NOTESDOCUMENT" Then
+			Set Me.Elements(UBound(Me.Elements)) = El
+			Me.ElementsUID(UBound(Me.Elements)) = El.UniversalID
+		Else
+			Me.Elements(UBound(Me.Elements)) = El
+		End If
+		Me.Count = UBound(Me.Elements)
+		Call Me.setOrder()
+		Call Me.setNth(UBound(Me.Elements))
+
+		GoTo fn
+eH:
+		errString = libName & "->" & fName & ", " & "стр." & Erl & ", " & Error$
+		Call sErr.Initialize(Err, errString)
+		Call sErr.Log
+		Resume fn
+fn:
+	End Sub
+	
+	Public Sub removeElement(n As Long)
+		On Error GoTo eH
+		
+		Dim sErr As New ErrorH
+		Dim fName, errString As String
+		fName = "collection.appendElement"
+		
+		Dim i As Long
+		If n < LBound(Me.Elements()) Or n > UBound(Me.Elements())Then
+			GoTo fn
+		End If
+		
+		For i = n To (UBound(Me.Elements) - 1)
+			If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+				Set Me.Elements(i) = Me.Elements(i + 1)
+				Me.ElementsUID(i) = Me.ElementsUID(i + 1)
+			Else
+				Me.Elements(i) = Me.Elements(i + 1)
+			End If
+		Next
+		
+		ReDim Preserve Me.Elements(1 To UBound(Me.Elements) - 1)
+		If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+			ReDim Preserve Me.ElementsUID(1 To UBound(Me.Elements) - 1)
+		End If
+		
+		Call Me.setOrder()
+		Call Me.setNth(n)
+
+		GoTo fn
+eH:
+		errString = libName & "->" & fName & ", " & "стр." & Erl & ", " & Error$
+		Call sErr.Initialize(Err, errString)
+		Call sErr.Log
+		Resume fn
+fn:
+	End Sub
+	%REM
+		Sub set(get)Nth
+		Description: Comments for Sub
+	%END REM
+	Private Sub setNth(n As Long)
+		If n < LBound(Me.Elements()) Or n > UBound(Me.Elements)Then
+			Me.nth = 0
+		Else
+			Me.nth = n
+		End If
+	End Sub
+	
+	Private Function getNth() As Long
+		getNth = Me.nth
+	End Function
+	
+	%REM
+		Sub setEmptyCollection
+		Description: Comments for Sub
+	%END REM
+	Private Sub setEmptyCollection()
+		
+		On Error GoTo eH
+		
+		Dim sErr As New ErrorH
+		Dim fName, errString As String
+		fName = "collection.setEmptyCollection"
+		
+		If Not IsEmpty(Elements()) Then Erase Elements()
+		If Not IsEmpty(ElementsUID()) Then Erase ElementsUID()
+		If Not IsEmpty(Order()) Then Erase Order()
+		Me.Count = 0
+		Me.FldSort = ""
+		Me.TypeSort = 0
+		Me.Nth = 0
+		
+		GoTo fn
+eH:
+		errString = libName & "->" & fName & ", " & "стр." & Erl & ", " & Error$
+		Call sErr.Initialize(Err, errString)
+		Call sErr.Log
+		Resume fn
+fn:
+	End Sub
+	
+	%REM
+		Function IsInitialized
+		Description: Comments for Function
+	%END REM
+	Public Function IsInitialized() As Boolean
+		If Me.Count = 0 Then
+			IsInitialized = False
+		Else
+			IsInitialized = True
+		End If
+	End Function
+	
+	%REM
+		Function getFirst(Previous, Next, Last)
+		Description: Comments for Function
+	%END REM
+	Public Function getFirst() As Variant
+		If Me.IsInitialized() Then
+			If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+				Set getFirst = Me.getElement(LBound(Me.Elements))
+			Else
+				getFirst = Me.getElement(LBound(Me.Elements))
+			End If
+			Call Me.setNth(LBound(Me.Elements))
+		End If
+	End Function
+	
+	Public Function getPrevious() As Variant
+		Dim n As Long
+		n = Me.getNth() - 1
+		If Me.IsInitialized() Then
+			If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+				If n < LBound(Me.Elements) Then
+					Set getPrevious = Nothing
+				Else
+					Set getPrevious = Me.getElement(n)
+				End If
+			Else
+				If n >= LBound(Me.Elements) Then
+					Set getPrevious = Me.getElement(n)
+				End If
+			End If
+			Call Me.setNth(n)
+		End If
+fn:
+	End Function
+	
+	Public Function getNext() As Variant
+		Dim n As Long
+		n = Me.getNth() + 1
+		If Me.IsInitialized() Then
+			If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+				If n > UBound(Me.Elements()) Then
+					Set getNext = Nothing
+				Else
+					Set getNext = Me.getElement(n)
+				End If
+			Else
+				If n =< UBound(Me.Elements()) Then
+					Set getNext = Me.getElement(n)
+				End If
+			End If
+			Call Me.setNth(n)
+		End If
+fn:
+	End Function
+	
+	Public Function getLast() As Variant
+		If Me.IsInitialized() Then
+			If TypeName(Me.Elements(LBound(Me.Elements))) = "NOTESDOCUMENT" Then
+				Set getLast = Me.getElement(UBound(Me.Elements))
+			Else
+				getLast = Me.getElement(UBound(Me.Elements))
+			End If
+			Call Me.setNth(UBound(Me.Elements))
+		End If
+	End Function
+	
+	%REM
+		Sub reInitialize
+		Description: Comments for Sub
+	%END REM
+	Public Sub reInitialize()
+		Call Me.setEmptyCollection()
+	End Sub
+	
+	Public Function getCount() As Long
+		getCount = Me.Count
+	End Function
+	
+	%REM
+		Function existIn
+		Description: Comments for Function
+	%END REM
+	Public Function isElem(element As Variant) As Boolean
+		Dim i As Integer
+		Dim arr As Variant
+		Dim el As Variant
+		
+		isElem = False
+		If TypeName(element) = "NOTESDOCUMENT" Then
+			arr = Me.ElementsUID
+			el =  element.UniversalID
+		Else
+			arr = Me.Elements
+			el = element
+		End If
+		
+		For i = LBound(Me.ElementsUID) To UBound(Me.ElementsUID)
+			If el = arr(i) Then
+				isElem = True
+				Exit For
+			End If
+		Next
+	End Function
+	Public Sub InitCollection(var As Variant)
+		On Error GoTo handler
+		Const FuncName = {Sub "collection.InitCollection"} 
+		Dim errStr As String
+		
+		Dim doc As NotesDocument
+		Dim i As Long
+		Dim dif As Integer
+		
+		i = 1
+		Select Case UCase(TypeName(var))
+			Case "NOTESDOCUMENTCOLLECTION":
+				
+				If var Is Nothing Then GoTo endh
+				Me.Count = var.Count
+				If Me.Count < 1 Then GoTo endh
+				
+				ReDim Elements(1 To Me.Count)
+				ReDim ElementsUID(1 To Me.Count)
+				
+				Set doc  = var.GetFirstDocument
+				' Подразумевается, что коллекция не из одной базы
+				' Сохраняем объект БД, чтобы не потерять документы
+				Set dbList(doc.Parentdatabase.Filepath) = doc.Parentdatabase	
+				
+				' Это быстрее For
+				While Not doc Is Nothing
+					Set Elements(i) = doc
+					ElementsUID(i) = doc.UniversalID
+					i=i+1
+					Set doc = Var.GetNextDocument(doc)
+				Wend
+				
+			Case "NOTESDOCUMENT":
+				
+				Set dbList(var.Parentdatabase.Filepath) = var.Parentdatabase
+				Me.Count = 1
+				ReDim Elements(1 To Me.Count)
+				ReDim ElementsUID(1 To Me.Count)
+				Set Elements(UBound(Elements)) = var
+				ElementsUID(UBound(ElementsUID)) = var.UniversalID
+				
+			Case "NOTESDATABASE":
+				
+				If Not IsElement(dbList(var.Filepath)) Then
+					Set dbList(var.Filepath) = var
+				End If
+				
+			Case Else:
+				Error 6001, "Неверный параметр"
+		End Select
+		
+		Call me.setNth(1)
+
+		GoTo endh
+handler:
+		ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+		Error Err, ErrStr
+endh:
+	End Sub
+End Class
+
+Public Class AgentEventLog As ErrorH
+	Public Sub New(), ErrorH()
+	
+	End Sub
+	
+	Public Sub InitEvent (AgentEvent As string)
+			Description = AgentEvent
+	End Sub
+	
+	Public Sub Log()
+		On Error GoTo Handler
+		Dim ss As New NotesSession
+		Dim tmp As Variant
+		Dim aLog As New NotesLog(ss.Currentdatabase.Filepath)
+		Call aLog.OpenNotesLog(ss.CurrentDatabase.Server, "alog.nsf")
+		tmp = Split(Me.Description,Chr(10) & Chr(13))
+		Call aLog.LogAction(Implode(tmp,{~}))
+		Set aLog = Nothing
+		
+		Exit Sub
+Handler:
+		Print "Невозможно записать ошибку: " & "(" & Err & ") " & Error$
+		Resume endH
+endH:
+	End Sub
+End class
+'++LotusScript Development Environment:2:2:Initialize:1:10
+Sub Initialize
+	nLine = Chr(10) & Chr(13)
+End Sub
+
+'++LotusScript Development Environment:2:1:AttachFile:1:8
+Function AttachFile(param As NotesDocument, mask As String, BodyName As String)	As boolean
+	On Error GoTo handler
+	Const FuncName = { Function "AttachFile" }
+	Dim ErrStr As String
+	
+	Dim ses As New NotesSession
+	Dim ws As  New NotesUIWorkspace
+	Dim rti As NotesRichTextItem
+	Dim files As variant
+	
+	If param.Hasitem("$File") Then
+		files = MessageBox("Данное действие удалит существующий файл и заменит новым. Вы уверены?",4+48,param.ParentDatabase.Title)	
+		If files = 7 Then GoTo endh
+	End If
+
+	If mask = "" Then
+		files = ws.Openfiledialog(False, "Документы")	
+	Else
+		' mask = "Notes Databases|*.nsf"
+		files = ws.Openfiledialog(False, "Документы",mask,"Desktop")
+	End If
+	
+	If IsEmpty(files) Then GoTo endh
+	
+	Call param.RemoveItem(BodyName)
+	
+	Set rti = New NotesRichTextItem(param,BodyName)
+	Select Case Left(ses.Platform,3)
+		Case "Win":
+			Call rti.embedobject(EMBED_ATTACHMENT,"", {\\?\} & files(0))
+		Case "Mac":
+			Call rti.embedobject(EMBED_ATTACHMENT,"", files(0))
+	End Select
+	
+		
+	AttachFile = true
+		
+	GoTo endh
+	
+handler:
+	ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+	Error Err,ErrStr
+endh:
+End Function
+
+'++LotusScript Development Environment:2:1:NeedUISave:1:8
+Function NeedUISave(param As NotesDocument) As Boolean
+	On Error GoTo handler
+	Const FuncName = {Function "NeedUISave" }
+	Dim ErrStr As String
+	
+	NeedUISave = True
+	
+	Dim macro As Variant
+	macro = Evaluate({@NoteID},param)
+	If macro(0) <> {NT00000000} Then	NeedUISave = False
+		
+	GoTo endh
+handler:
+	ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+	Error Err, ErrStr
+endh:
+End Function
+
+'++LotusScript Development Environment:2:1:FileExists:1:8
+Function FileExists (strPath As String) As Boolean
+	On Error GoTo handler
+	Const FuncName = {Function "FileExists" }
+	Dim errStr As String
+	
+	fileExists = (Dir$ (strPath) <> "" )
+	
+	GoTo endh
+handler:
+	ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$ & nline & strPath
+	Error Err,ErrStr
+endh:
+End Function
+
+'++LotusScript Development Environment:2:1:A1_ReplaceSubString:1:8
+Function A1_ReplaceSubString(searchStr As String, oldStr As String, newStr As String) As String
+	On Error GoTo handler
+	Const FuncName = {Function "A1_ReplaceSubString"}
+	Dim errStr As String
+	
+	Dim txt As String
+	txt = searchStr
+	Do While InStr(txt, oldStr) > 0
+		txt = StrLeft(txt, oldStr) & newStr & StrRight(txt, oldStr)
+	Loop
+	A1_ReplaceSubString = txt
+
+	GoTo endh
+handler:
+	ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+	Error Err, errStr
+endh:
+End Function
+
+'++LotusScript Development Environment:2:1:ExtractFile:1:8
+Function ExtractFile(param As NotesDocument, BodyName As String, TargetPath As String) As Boolean
+	On Error GoTo handler
+	Const FuncName = { Function "ExtractFile" }
+	Dim ErrStr As String
+	
+	Dim rti As NotesRichTextItem
+
+	If Not param.Hasitem("$File") Then GoTo endh
+	
+	Set rti = param.Getfirstitem(BodyName) 
+	'New NotesRichTextItem(param,BodyName)
+
+	If rti Is Nothing Then GoTo endh
+
+	ForAll x In rti.Embeddedobjects
+		If Right(TargetPath,1) = {\} Then
+			If FileExists (TargetPath & x.name) Then kill TargetPath & x.name
+			Call x.ExtractFile( TargetPath & x.name)
+		Else
+			If FileExists (TargetPath & x.name) Then Kill TargetPath & x.name
+			Call x.ExtractFile( TargetPath & {\} & x.name)
+		End If
+	End ForAll
+		
+	ExtractFile = True
+	
+	GoTo endh
+	
+handler:
+	ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+	Error Err,ErrStr
+endh:
+End Function
+
+'++LotusScript Development Environment:2:2:RefreshRT:1:8
+Sub RefreshRT(pUIDoc As NotesUIDocument)
+	On Error GoTo handler
+	Const FuncName = {Sub "RefreshRT" }
+	Dim ErrStr As String
+	
+	Dim doc As NotesDocument
+	Set doc = pUIDoc.Document
+	Dim rti As New NotesRichTextItem(doc, doc.UniversalID)
+	Call rti.CopyItemToDocument(doc, doc.UniversalID & "_")
+	Call rti.Remove()
+	Call doc.RemoveItem(doc.UniversalID & "_")
+	Dim ws As New NotesUIWorkspace
+	Call doc.RemoveItem("Locked")
+	Call ws.EditDocument(True, doc)    
+	Call doc.ReplaceItemValue("SaveOptions", "0")
+	Call pUIDoc.Close()
+	
+	GoTo endh
+handler:
+	ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+	Error Err,ErrStr
+endh:
+End Sub
+
+'++LotusScript Development Environment:2:1:A1_SendMail:1:8
+Function A1_SendMail(sendFrom As Variant, subject As String, sendTo As Variant, copyTo As Variant, blindCopyTo As Variant, body As Variant) As Boolean
+	On Error GoTo handler
+	Const FuncName = {Function "A1_SendMail"}
+	Dim ErrStr As String
+	
+	Dim ses As New NotesSession
+	Dim dbM As NotesDatabase
+	Dim docM As NotesDocument
+	Dim rti As NotesRichTextItem
+	Dim i As Integer
+	
+	If ses.currentdatabase Is Nothing Then Error 5000, "Отсутствует бд для запуска"
+	Set dbM = ses.Getdatabase(ses.Currentdatabase.Server, "mail.box")
+	Set docM = dbM.Createdocument()
+	Call docM.Replaceitemvalue("Form", "Memo")
+	Call docM.Replaceitemvalue("From", sendFrom)
+	Call docM.Replaceitemvalue("Subject", subject)
+	Call docM.Replaceitemvalue("PostedDate", Now())
+	
+	Call docM.Replaceitemvalue("Recipients", sendTo)
+	Call docM.Replaceitemvalue("SendTo", sendTo)
+	Call docM.Replaceitemvalue("CopyTo", copyTo)
+	Call docM.Replaceitemvalue("BlindCopyTo", blindCopyTo)
+	Call docM.Replaceitemvalue("Principal", ses.username)
+	
+	If IsObject(body) Then
+		If body IsA "NotesItem" Or body IsA "NotesRichTextItem" Then
+			Set rti = body
+			Call docM.Copyitem(rti, "Body")
+		End If
+	Else
+		Set rti = docM.Createrichtextitem("Body")
+		If IsArray(body) Then
+			For i = LBound(body) To UBound(body)
+				Call rti.Appendtext("" & body(i))
+				If i <> UBound(body) Then
+					Call rti.Addnewline(1)
+				End If
+			Next
+		Else
+			Call rti.Appendtext("" & body)
+		End If
+	End If
+	If docM.save(True, True) Then A1_SendMail = True
+	
+	GoTo endh
+handler:
+	ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+	Error Err, errStr
+endh:
+End Function
+
+'++LotusScript Development Environment:2:1:GetNotesTemp:1:8
+Function GetNotesTemp(Platform As String) As String
+	On Error GoTo handler
+	Const FuncName = {Function "GetNotesTemp" }
+	Dim ErrStr As String
+		
+	Dim tmppth As string
+	Dim d As String*256
+	Dim s As Integer
+	
+	GetNotesTemp = ""
+	
+	Select Case Left(Platform,3)
+		Case "Lin":
+			s = linux_OSGetSystemTempDirectory(d)
+			tmppth = Left(d,s) & {/}
+
+		Case "Mac":
+			s = mac_OSGetSystemTempDirectory(d)
+			tmppth = Left(d,s) & {/}
+
+		Case "Win":
+			s = w32_OSGetSystemTempDirectory(d)
+			tmppth = Left(d,s) & {\}
+
+	End Select
+
+	GetNotesTemp = tmppth
+	
+	GoTo endh
+handler:
+	ErrStr = libName & ", " & FuncName & ": " & Err &", в стр " & Erl & nLine & Error$
+	Error Err,ErrStr
+endh:
+End Function
+
+
+
+
+
+
+
+
+
+

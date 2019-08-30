@@ -1,0 +1,660 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+'********************************************
+'Library fieldViewerLib
+'Olimpus: Aug 30, 2019
+'********************************************
+Option Public
+Option Declare
+Use "A1_Setup"
+Use "ArrayTools"
+
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Sub Initialize
+Declare Function FVL_queryOpen (Source As NotesUIDocument, Mode As Integer, Isnewdoc As Variant, Continue As Variant) As Boolean
+Declare Function FVL_getItemType (itmType As Long) As String
+Declare Function FVL_setItemType (value As Variant, itmType As Long) As Variant
+Declare Function FVL_saveAndClose() As Boolean
+Declare Function FVL_selectItem
+Declare Sub FVL_add
+Declare Sub FVL_change
+Declare Sub FVL_deleteItem
+Declare Sub FVL_setItem
+Declare Sub FVL_postOpen (Source As NotesUIDocument)
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+Private nLine As String
+Private Const designElem = "fieldViewerLib"
+
+Private tServer As String
+Private tUnid As String
+Private tDb As String
+
+Public docP As NotesDocument
+
+Dim newFieldName As Variant
+Dim newFieldType As Variant
+Dim newFieldMultiple As Variant
+Dim newFieldValue As Variant
+Dim newFieldAction As Variant
+
+'++LotusScript Development Environment:2:2:Initialize:2:10
+
+Sub Initialize
+	On Error GoTo ErrH
+	nLine = Chr(10) & Chr(13)
+
+	
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+	Resume endH
+EndH:
+End Sub
+
+
+'++LotusScript Development Environment:2:1:FVL_queryOpen:6:8
+'********************************************
+'Function FVL_queryOpen
+'Boolean
+'Olimpus: Aug 30, 2019
+'********************************************
+Function FVL_queryOpen (Source As NotesUIDocument, Mode As Integer, Isnewdoc As Variant, Continue As Variant) As Boolean
+	On Error GoTo ErrH
+
+	Dim s As New NotesSession
+	Dim dbP As NotesDatabase
+	
+	Continue = False
+	
+	tserver = s.GetEnvironmentString("tserver")
+	tdb = s.GetEnvironmentString("tdb")
+	tunid = s.GetEnvironmentString("tunid")
+	
+	Continue = True
+
+	FVL_queryOpen = Continue
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Function
+
+
+'++LotusScript Development Environment:2:1:FVL_getItemType:6:8
+'********************************************
+'Function FVL_getItemType
+'String
+'Olimpus: Aug 30, 2019
+'********************************************
+Function FVL_getItemType (itmType As Long) As String
+	On Error GoTo ErrH
+
+	Dim tp As String
+	Select Case itmType
+		Case 16: tp = "ACTIONCD"
+		Case 17: tp = "ASSISTANTINFO"
+		Case 1084: tp = "ATTACHMENT"
+		Case 1076: tp = "AUTHORS"
+		Case 2: tp = "COLLATION"
+		Case 1024: tp = "DATETIMES"
+		Case 1090: tp = "EMBEDDEDOBJECT"
+		Case 256: tp = "ERRORITEM"
+		Case 1536: tp = "FORMULA"
+		Case 21: tp = "HTML"
+		Case 6: tp = "ICON"
+		Case 20: tp = "LSOBJECT"
+		Case 25: tp = "MIME_PART"
+		Case 1074: tp = "NAMES"
+		Case 7: tp = "NOTELINKS"
+		Case 4: tp = "NOTEREFS"
+		Case 768: tp = "NUMBERS"
+		Case 1085: tp = "OTHEROBJECT"
+		Case 15: tp = "QUERYCD"
+		Case 1075: tp = "READERS"
+		Case 1282: tp = "RFC822Text"
+		Case 1: tp = "RICHTEXT"
+		Case 8: tp = "SIGNATURE"
+		Case 1280: tp = "TEXT"
+		Case 512: tp = "UNAVAILABLE"
+		Case 0: tp = "UNKNOWN"
+		Case 14: tp = "USERDATA"
+		Case 1792: tp = "USERID"
+		Case 18: tp = "VIEWMAPDATA"
+		Case 19: tp = "VIEWMAPLAYOUT"
+		Case Else: tp = "UNKNOWN"
+	End Select 
+	FVL_getItemType = tp
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Function
+
+
+'++LotusScript Development Environment:2:1:FVL_setItemType:6:8
+'********************************************
+'Function setItemType
+'Variant
+'Olimpus: Aug 30, 2019
+'********************************************
+Function FVL_setItemType (value As Variant, itmType As Long) As Variant
+	On Error GoTo ErrH
+
+	Dim tp As Variant
+	Select Case CLng(itmType)
+		Case 1076:
+			Set tp = New NotesName(value)
+			tp = tp.Canonical
+		Case 1024:
+			tp = CDat(value)
+		Case 1074:
+			Set tp = New NotesName(value)
+			tp = tp.Canonical
+		Case 768:
+			tp = CDbl(value)
+		Case 1075:
+			Set tp = New NotesName(value)
+			tp = tp.Canonical
+		Case 1:
+			tp = value
+		Case 1280:
+			tp = CStr(value)
+	End Select 
+	FVL_setItemType = tp
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Function
+
+'++LotusScript Development Environment:2:1:FVL_saveAndClose:6:8
+'********************************************
+'Function FVL_saveAndClose
+'Boolean
+'Olimpus: Aug 30, 2019
+'********************************************
+Function FVL_saveAndClose() As Boolean
+	On Error GoTo ErrH
+
+	Dim i As Integer, j As Integer
+	Dim newVal As Variant
+	Dim newValF As Variant
+	Dim rti As NotesRichTextItem
+	Dim ws As New NotesUIWorkspace
+	
+	If Not IsEmpty(newFieldName) Then
+		For i = 0 To UBound(newFieldName)
+			If newFieldAction(i) = "Delete" Then
+				Call docP.RemoveItem(newFieldName(i))
+			Else
+				If newFieldMultiple(i) = "1" Then
+					newVal = Split(newFieldValue(i), Chr(10))
+					ReDim newValF(UBound(newVal))
+					For j = 0 To UBound(newVal)
+						newValF(j) = FVL_setItemType(newVal(j), CLng(newFieldType(i)))
+					Next
+				Else
+					newValF = FVL_setItemType(newFieldValue(i), CLng(newFieldType(i)))
+				End If
+				Select Case CLng(newFieldType(i))
+				Case 1076:
+					docP.ReplaceItemValue(newFieldName(i), newValF).Isauthors = True
+				Case 1074:
+					docP.ReplaceItemValue(newFieldName(i), newValF).Isnames = True
+				Case 1075:
+					docP.ReplaceItemValue(newFieldName(i), newValF).Isreaders = True
+				Case 1:
+					Set rti = Nothing
+					Set rti = docP.GetFirstItem(newFieldName(i))
+					If rti Is Nothing Then Set rti = New NotesRichTextItem(docP, newFieldName(i))
+					rti.Text = newValF
+				Case Else:
+					Call docP.ReplaceItemValue(newFieldName(i), newValF)
+			End Select 
+			End If
+		Next
+	End If
+	
+	Call docP.Save(True, docP.IsResponse)
+	Call ws.CurrentDocument.Close
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Function
+
+
+'++LotusScript Development Environment:2:1:FVL_selectItem:6:8
+'********************************************
+'Function FVL_selectItem
+'Variant
+'Olimpus: Aug 30, 2019
+'********************************************
+Function FVL_selectItem
+	On Error GoTo ErrH
+
+	Dim ws As New NotesUIWorkspace
+	Dim doc As NotesDocument
+	Dim names As Variant
+	Dim ans As Variant
+	Dim i As Integer
+	
+	Set doc = ws.CurrentDocument.Document
+	names = doc.GetItemValue("tnames")
+	ans = ws.Prompt (PROMPT_OKCANCELLIST, "Select a Item Name", 	"Select a Name to info.", 	names(0), names)
+	
+	If Not IsEmpty(ans) Then
+		For i = 0 To UBound(names)
+			If ans = names(i) Then Exit For
+		Next
+		Call doc.ReplaceItemValue("FieldName", names(i))
+		Call doc.ReplaceItemValue("FieldInfo", doc.GetItemValue("tinfo")(i))
+		Call doc.ReplaceItemValue("FieldType", doc.GetItemValue("ttypes")(i))
+		Call doc.ReplaceItemValue("FieldMultiple", doc.GetItemValue("tmultiplies")(i))
+		Call doc.ReplaceItemValue("FieldValue", doc.GetItemValue("tvalues")(i))
+		Call doc.ReplaceItemValue("FieldValueNew", doc.GetItemValue("tvalues")(i))
+		Call doc.ReplaceItemValue("FieldValueNewM", doc.GetItemValue("tvalues")(i))
+		Call ws.CurrentDocument.Refresh
+	End If
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Function
+
+
+'++LotusScript Development Environment:2:2:FVL_add:5:8
+'********************************************
+'Sub FVL_add
+'Olimpus: Aug 30, 2019
+'********************************************
+Sub FVL_add
+	On Error GoTo ErrH
+
+	Dim ws As New NotesUIWorkspace
+	Dim doc As NotesDocument
+	
+	Set doc = ws.CurrentDocument.Document
+	Call doc.ReplaceItemValue("Add", "1")
+	Call ws.CurrentDocument.Refresh
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Sub
+
+
+
+'++LotusScript Development Environment:2:2:FVL_change:5:8
+'********************************************
+'Sub FVL_change
+'Olimpus: Aug 30, 2019
+'********************************************
+Sub FVL_change
+	On Error GoTo ErrH
+
+	Dim ws As New NotesUIWorkspace
+	Dim doc As NotesDocument
+	
+	Set doc = ws.CurrentDocument.Document
+	Call doc.ReplaceItemValue("Change", "1")
+	Call ws.CurrentDocument.Refresh
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Sub
+
+'++LotusScript Development Environment:2:2:FVL_deleteItem:5:8
+'********************************************
+'Sub FVL_deleteItem
+'Olimpus: Aug 30, 2019
+'********************************************
+Sub FVL_deleteItem
+	On Error GoTo ErrH
+
+	Dim ws As New NotesUIWorkspace
+	Dim doc As NotesDocument
+	
+	Set doc = ws.CurrentDocument.Document
+	Call doc.ReplaceItemValue("Delete", "1")
+	Call ws.CurrentDocument.Refresh
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Sub
+
+'++LotusScript Development Environment:2:2:FVL_setItem:5:8
+'********************************************
+'Sub FVL_setItem
+'Olimpus: Aug 30, 2019
+'********************************************
+Sub FVL_setItem
+	On Error GoTo ErrH
+
+	Dim ws As New NotesUIWorkspace
+	Dim doc As NotesDocument
+	Dim names As Variant
+	Dim types As Variant
+	Dim multiplies As Variant
+	Dim values As Variant
+	Dim info As Variant
+	Dim nameN As Variant
+	Dim typeN As Variant
+	Dim multiplieN As Variant
+	Dim valueN As Variant
+	Dim infoN As Variant
+	Dim i As Integer, j As Integer
+	Dim add As Boolean
+	
+	Set doc = ws.CurrentDocument.Document
+	
+	names = doc.GetItemValue("tnames")
+	types = doc.GetItemValue("ttypes")
+	multiplies = doc.GetItemValue("tmultiplies")
+	values = doc.GetItemValue("tvalues")
+	info = doc.GetItemValue("tinfo")
+	
+	If doc.GetItemValue("Add")(0) = "1" Then
+		nameN = doc.GetItemValue("FieldNameNew")(0)
+		If nameN = "" Then Exit Sub
+		typeN = CLng(doc.GetItemValue("FieldType")(0))
+		If doc.GetItemValue("FieldMultiple")(0) = "1" Then
+			multiplieN = "1"
+			For i = 0 To UBound(doc.GetItemValue("FieldValueNewM"))
+				If i <> UBound(doc.GetItemValue("FieldValueNewM")) Then
+					valueN = valueN & doc.GetItemValue("FieldValueNewM")(i) & Chr(10)
+				Else
+					valueN = valueN & doc.GetItemValue("FieldValueNewM")(i)
+				End If
+			Next
+			infoN =  FVL_getItemType(CLng(typeN)) & ", Multiple, " & doc.GetFirstItem("FieldValueNewM").Valuelength & "bytes, " & CStr(doc.GetFirstItem("FieldValueNewM").Lastmodified)
+		Else
+			multiplieN = "0"
+			valueN = CStr(doc.GetItemValue("FieldValueNew")(0))
+			infoN =  FVL_getItemType(CLng(typeN)) & ", " & doc.GetFirstItem("FieldValueNew").Valuelength & "bytes, " & CStr(doc.GetFirstItem("FieldValueNew").Lastmodified)
+		End If
+	ElseIf doc.GetItemValue("Change")(0) = "1" Then
+		nameN = doc.GetItemValue("FieldName")(0)
+		If nameN = "" Then Exit Sub
+		For i = LBound(names) To UBound(names)
+			If nameN = names(i) Then
+				typeN = types(i)
+				multiplieN = multiplies(i)
+				If multiplieN = "1" Then
+					For j = 0 To UBound(doc.GetItemValue("FieldValueNewM"))
+						If j <> UBound(doc.GetItemValue("FieldValueNewM")) Then
+							valueN = valueN & doc.GetItemValue("FieldValueNewM")(j) & Chr(10)
+						Else
+							valueN = valueN & doc.GetItemValue("FieldValueNewM")(j)
+						End If
+					Next
+					infoN =  FVL_getItemType(CLng(typeN)) & ", Multiple, " & doc.GetFirstItem("FieldValueNewM").Valuelength & "bytes, " & CStr(doc.GetFirstItem("FieldValueNewM").Lastmodified)
+				Else
+					valueN = CStr(doc.GetItemValue("FieldValueNew")(0))
+					infoN =  FVL_getItemType(CLng(typeN)) & ", " & doc.GetFirstItem("FieldValueNew").Valuelength & "bytes, " & CStr(doc.GetFirstItem("FieldValueNew").Lastmodified)
+				End If
+				Exit For
+			End If
+		Next
+	ElseIf doc.GetItemValue("Delete")(0) = "1" Then
+		nameN = doc.GetItemValue("FieldName")(0)
+		If nameN = "" Then Exit Sub
+		For i = LBound(names) To UBound(names)
+			If nameN = names(i) Then
+				typeN = types(i)
+				multiplieN = multiplies(i)
+				valueN = values(i)
+				infoN =  info(i)
+				Exit For
+			End If
+		Next
+	End If
+	
+	
+	If doc.GetItemValue("Add")(0) = "1" Then
+		add = True
+		For i = UBound(names) To LBound(names) Step -1
+			If names(i) = nameN Then
+				add = False
+				names(i) = nameN
+				types(i) = typeN
+				multiplies(i) = multiplieN
+				values(i) = valueN
+				info(i) = infoN
+				Exit For
+			End If
+		Next
+		
+		If add Then
+			ReDim Preserve names(UBound(names) + 1)
+			ReDim Preserve types(UBound(types) + 1)
+			ReDim Preserve multiplies(UBound(multiplies) + 1)
+			ReDim Preserve values(UBound(values) + 1)
+			ReDim Preserve info(UBound(info) + 1)
+			For i = UBound(names) To LBound(names) Step -1
+				If i = 0 Then
+					names(i) = nameN
+					types(i) = typeN
+					multiplies(i) = multiplieN
+					values(i) = valueN
+					info(i) = infoN
+					Exit For
+				ElseIf names(i - 1) > nameN Then
+					names(i) = names(i - 1)
+					types(i) = types(i - 1)
+					multiplies(i) = multiplies(i - 1)
+					values(i) = values(i - 1)
+					info(i) = info(i - 1)
+				ElseIf names(i - 1) < nameN And (names(i) > nameN Or i = UBound(names)) Then
+					names(i) = nameN
+					types(i) = typeN
+					multiplies(i) = multiplieN
+					values(i) = valueN
+					info(i) = infoN
+					Exit For
+				End If
+			Next
+		End If
+	ElseIf doc.GetItemValue("Change")(0) = "1" Then
+		For i = UBound(names) To LBound(names) Step -1
+			If names(i) = nameN Then
+				names(i) = nameN
+				types(i) = typeN
+				multiplies(i) = multiplieN
+				values(i) = valueN
+				info(i) = infoN
+				Exit For
+			End If
+		Next
+	ElseIf doc.GetItemValue("Delete")(0) = "1" Then
+		For i = LBound(names) To UBound(names) - 1
+			If names(i) >= nameN Then
+				names(i) = names(i + 1)
+				types(i) = types(i + 1)
+				multiplies(i) = multiplies(i + 1)
+				values(i) = values(i + 1)
+				info(i) = info(i + 1)
+				Exit For
+			End If
+		Next
+		ReDim Preserve names(UBound(names) - 1)
+		ReDim Preserve types(UBound(types) - 1)
+		ReDim Preserve multiplies(UBound(multiplies) - 1)
+		ReDim Preserve values(UBound(values) - 1)
+		ReDim Preserve info(UBound(info) - 1)
+	End If
+	
+	If IsEmpty(newFieldName) Then
+		i = 0
+		ReDim newFieldName(i) As Variant
+		ReDim newFieldType(i) As Variant
+		ReDim newFieldMultiple(i) As Variant
+		ReDim newFieldValue(i) As Variant
+		ReDim newFieldAction(i) As Variant
+	ElseIf newFieldName(UBound(newFieldName)) = "" Then
+		i = UBound(newFieldName)
+	Else
+		i = UBound(newFieldName) + 1
+		ReDim Preserve newFieldName(i) As Variant
+		ReDim Preserve newFieldType(i) As Variant
+		ReDim Preserve newFieldMultiple(i) As Variant
+		ReDim Preserve newFieldValue(i) As Variant
+		ReDim Preserve newFieldAction(i) As Variant
+	End If
+	
+	newFieldName(i) = nameN
+	newFieldType(i) = typeN
+	newFieldMultiple(i) = multiplieN
+	newFieldValue(i) = valueN
+	If doc.GetItemValue("Add")(0) = "1" Then
+		newFieldAction(i) = "Add"
+	ElseIf doc.GetItemValue("Change")(0) = "1" Then
+		newFieldAction(i) = "Change"
+	ElseIf doc.GetItemValue("Delete")(0) = "1" Then
+		newFieldAction(i) = "Delete"
+	End If
+	
+	Call doc.ReplaceItemValue("tnames", names)
+	Call doc.ReplaceItemValue("ttypes", types)
+	Call doc.ReplaceItemValue("tmultiplies", multiplies)
+	Call doc.ReplaceItemValue("tvalues", values)
+	Call doc.ReplaceItemValue("tinfo", info)
+	
+	Call doc.ReplaceItemValue("FieldNameNew", "")
+	Call doc.ReplaceItemValue("FieldName", "")
+	Call doc.ReplaceItemValue("FieldInfo", "")
+	Call doc.ReplaceItemValue("FieldType", "")
+	Call doc.ReplaceItemValue("FieldMultiple", "")
+	Call doc.ReplaceItemValue("FieldValueNewM", "")
+	Call doc.ReplaceItemValue("FieldValueNew", "")
+	Call doc.ReplaceItemValue("FieldValue", "")
+	
+	If doc.GetItemValue("Add")(0) = "1" Then
+		Call doc.RemoveItem("Add")
+	ElseIf doc.GetItemValue("Change")(0) = "1" Then
+		Call doc.RemoveItem("Change")
+	ElseIf doc.GetItemValue("Delete")(0) = "1" Then
+		Call doc.RemoveItem("Delete")
+	End If
+	
+	Call ws.CurrentDocument.Refresh
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Sub
+
+'++LotusScript Development Environment:2:2:FVL_postOpen:5:8
+'********************************************
+'Sub FVL_postOpen
+'Olimpus: Aug 30, 2019
+'********************************************
+Sub FVL_postOpen (Source As NotesUIDocument)
+	On Error GoTo ErrH
+
+	Dim s As New NotesSession
+	Dim dbP As NotesDatabase
+	Dim doc As NotesDocument
+	Dim item As Variant
+	Dim cl As Collection
+	Dim i As Long, j As Long
+	Dim names As Variant
+	Dim types As Variant
+	Dim multiplies As Variant
+	Dim values As Variant
+	Dim info As Variant
+	Dim itemType As String
+	
+	If tserver = "" Or tdb = "" Or Len(tunid) <> 32 Then GoTo EndH
+	Set dbP = s.GetDatabase(tserver, tdb, False)
+	Set docP = dbP.Getdocumentbyunid(tunid)
+	If docP Is Nothing Then GoTo EndH
+	
+	Set doc = Source.Document
+	If docP Is Nothing Then GoTo EndH
+	Set cl = New Collection
+	ForAll itm In docP.Items
+		If cl.IsInitialized() Then
+			Call cl.appendElement(itm.Name)
+		Else
+			Call cl.initialize(itm.Name)
+		End If
+	End ForAll
+	Call cl.sort(1, "")
+	
+	i = 1
+	ReDim names (0 To cl.getCount - 1)
+	ReDim types (0 To cl.getCount - 1)
+	ReDim multiplies (0 To cl.getCount - 1)
+	ReDim values (0 To cl.getCount - 1)
+	ReDim info (0 To cl.getCount - 1)
+	While i <= cl.getCount
+		Set item = docP.GetFirstItem(cl.getElement(i))
+		names(i - 1) = cl.getElement(i)
+		types (i - 1) = CStr(item.Type)
+		itemType = FVL_getItemType(item.Type)
+		If IsArray(item.Values) Then
+			If UBound(item.Values) > 0 Then
+				multiplies(i - 1) = "1"
+			Else
+				multiplies(i - 1) = "0"
+			End If
+			
+			For j = 0 To UBound(item.Values)
+				values(i - 1) = values(i - 1) & item.Values(j) & Chr(10)
+			Next
+			
+			info(i - 1) =  itemType & ", Multiple, " & item.Valuelength & item.Valuelength & "bytes, " & CStr(item.Lastmodified)
+		Else
+			multiplies(i - 1) = "0"
+			values(i - 1) = CStr(item.Values)
+			info(i - 1) =  itemType & ", " & item.Valuelength & item.Valuelength & "bytes, " & CStr(item.Lastmodified)
+		End If
+		i = i + 1
+	Wend
+	Call doc.ReplaceItemValue("tnames", names)
+	Call doc.ReplaceItemValue("ttypes", types)
+	Call doc.ReplaceItemValue("tmultiplies", multiplies)
+	Call doc.ReplaceItemValue("tvalues", values)
+	Call doc.ReplaceItemValue("tinfo", info)
+	Call doc.ReplaceItemValue("tserver", tserver)
+	Call doc.ReplaceItemValue("tdb", tdb)
+	Call doc.ReplaceItemValue("tunid", tunid)
+	Call doc.ReplaceItemValue("tunid_Dsp", tunid)
+	
+	Dim authors As Variant
+	Dim readers As Variant
+	ReDim authors(0)
+	ReDim readers(0)
+	ForAll itm In docP.items
+		If itm.isAuthors Then authors = ArrayAppend(authors, itm.values)
+		If itm.isReaders Then readers = ArrayAppend(readers, itm.values)
+	End ForAll
+	
+	authors = FullTrim(ArrayUnique(authors))
+	Call quicksort(LBound(authors), UBound(authors), authors, SORT_DIRECTION_UP)
+	readers = FullTrim(ArrayUnique(readers))
+	Call quicksort(LBound(readers), UBound(readers), readers, SORT_DIRECTION_UP)
+	Call doc.Replaceitemvalue("authors", authors)
+	Call doc.Replaceitemvalue("readers", readers)
+	
+	Call Source.Refresh
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Sub

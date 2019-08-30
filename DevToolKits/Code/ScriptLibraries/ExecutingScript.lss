@@ -1,0 +1,150 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+'********************************************
+'Library ExecutingScript
+'Olimpus: Aug 29, 2019
+'********************************************
+Option Public
+Option Declare
+
+Use "ExecuteLib"
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Class scriptExecutor
+Declare Sub Initialize
+Declare Function openExecutorDocument
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+Private nLine As String
+Private Const designElem = "ExecutingScript"
+
+Public Const EXECUTOR_SCRIPT_FORM = "executeScript"
+Private Const EXECUTOR_SCRIPT_FIELD_NAME = "script_"
+Private Const EXECUTOR_SCRIPT_ENV_UNID = "EXECUTOR_SCRIPT_DOCUMENT_UNID"
+Private Const EXECUTOR_SCRIPT_ENV_SERVER = "EXECUTOR_SCRIPT_DATABASE_SERVER"
+Private Const EXECUTOR_SCRIPT_ENV_PATH = "EXECUTOR_SCRIPT_DATABASE_PATH"
+
+'********************************************
+'Class scriptExecutor
+'Olimpus: Aug 29, 2019
+'********************************************
+Class scriptExecutor
+	Private executor As Executor
+	Private doc As NotesDocument
+	Private exDoc As NotesDocument
+	Private exDocUNID As String
+	Private exDb As NotesDatabase
+	Private exDbPath As String
+	Private exDbServer As String
+	Private currPosition As Integer
+	
+	Sub New (doc As NotesDocument)
+		On Error GoTo ErrH
+		
+		Dim s As New NotesSession
+		exDocUNID = s.Getenvironmentstring(EXECUTOR_SCRIPT_ENV_UNID)
+		exDbPath = s.Getenvironmentstring(EXECUTOR_SCRIPT_ENV_PATH)
+		exDbServer = s.Getenvironmentstring(EXECUTOR_SCRIPT_ENV_SERVER)
+		Call s.Setenvironmentvar(EXECUTOR_SCRIPT_ENV_UNID, "")
+		Call s.Setenvironmentvar(EXECUTOR_SCRIPT_ENV_PATH, "")
+		Call s.Setenvironmentvar(EXECUTOR_SCRIPT_ENV_SERVER, "")
+		
+		Set Me.doc = doc
+		Set exDb = s.Getdatabase(exDbServer, exDbPath)
+		Set exDoc = exDb.Getdocumentbyunid(exDocUNID)
+		currPosition = CInt(doc.Getitemvalue("position")(0))
+		Call Me.doc.Replaceitemvalue("script", Me.Doc.Getitemvalue(EXECUTOR_SCRIPT_FIELD_NAME & currPosition))
+		
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Sub
+	'********************************************
+	'Function queryClose
+	'Variant
+	'Olimpus: Aug 29, 2019
+	'********************************************
+	Function queryClose()
+		On Error GoTo ErrH
+
+		Call doc.Replaceitemvalue("position", currPosition)
+		Call doc.Replaceitemvalue(EXECUTOR_SCRIPT_FIELD_NAME & currPosition, doc.Getitemvalue("script"))
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function executeScript
+	'Boolean
+	'Olimpus: Aug 29, 2019
+	'********************************************
+	Function executeScript() As Boolean
+		On Error GoTo ErrH
+		
+		Set executor = New Executor(doc.Getitemvalue("script")(0))
+		Set executor.setParameter = exDoc
+		executeScript = executor.run()
+		
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+End Class
+'++LotusScript Development Environment:2:2:Initialize:2:10
+
+Sub Initialize
+	On Error GoTo ErrH
+	nLine = Chr(10) & Chr(13)
+
+	
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+	Resume endH
+EndH:
+End Sub
+
+
+'++LotusScript Development Environment:2:1:openExecutorDocument:6:8
+'********************************************
+'Function openExecutorDocument
+'Variant
+'Olimpus: Aug 29, 2019
+'********************************************
+Function openExecutorDocument
+	On Error GoTo ErrH
+
+	Dim ws As New NotesUIWorkspace
+	Dim s As New NotesSession
+	Dim exDoc As NotesDocument
+	Dim exDc As NotesDocumentCollection
+	Dim okPressed As Boolean
+	
+	Set exDc = s.Currentdatabase.search({form = "} & EXECUTOR_SCRIPT_FORM & {"}, Nothing, 0)
+	
+	If exDc.Count = 0 Then
+		Set exDoc = s.Currentdatabase.Createdocument()
+		Call exDoc.Replaceitemvalue("form", EXECUTOR_SCRIPT_FORM)
+		Call exDoc.Replaceitemvalue("position", 1)
+		Call exDoc.Save(True, False)
+	Else
+		Set exDoc = exDc.Getfirstdocument()
+	End If
+	
+	okPressed = ws.Dialogbox(EXECUTOR_SCRIPT_FORM, True, True, False, False, False, False, "Выполнятель скриптов", exDoc, True, False, True)
+	
+	If okPressed Then
+		Call exDoc.save(True, False)
+	End If
+	
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+End Function
+
+

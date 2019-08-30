@@ -1,0 +1,126 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+%REM
+	Library LS2JJavaTestLib
+	Created Dec 25, 2018 by Alexandr S. Olympiev/OTTO/RU
+	Description: Comments for Library
+%END REM
+Option Public
+Option Declare
+UseLSX "*javacon"
+Use "JavaTestLib"
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Sub Initialize
+Declare Sub setSystemPath (path As String)
+Declare Function getJavaVersion As String
+Declare Function getSystemPath As String 
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+Private Const DesignElem = {LS2JJavaTestLib}
+Private nLine As String
+
+'++LotusScript Development Environment:2:2:Initialize:2:10
+
+Sub Initialize
+	Const FuncName = {Initialize}
+	On Error GoTo ErrH
+	nLine = Chr(10) & Chr(13)
+
+
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & funcName & ", c. " & CStr(ErL) & nLine & Error$
+	Resume EndH
+EndH:
+End Sub
+
+
+
+'++LotusScript Development Environment:2:2:setSystemPath:5:8
+' Library LS2JJavaTestLib -> Sub setSystemPath
+' 
+' DCS-Olympiev Dec 25, 2018
+' *********************************************************************************
+Sub setSystemPath (path As String)
+	Const FuncName = {setSystemPath}
+	On Error GoTo ErrH
+
+If path = "" Then GoTo endH
+	Dim jSession As JavaSession
+	Dim jError As JavaError
+	Dim jClass As JavaClass
+	Dim jObject As JavaObject
+	
+	Set jSession = New JavaSession
+	Set jClass = jSession.GetClass("TestObject")
+	Set jObject = jClass.CreateObject()
+		
+	jObject.setSystemPath(path)
+	
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & funcName & ", c. " & CStr(ErL) & nLine & Error$
+	Resume EndH
+EndH:
+End Sub
+
+
+'++LotusScript Development Environment:2:1:getJavaVersion:5:8
+' Library LS2JJavaTestLib -> Sub getJavaVersion
+' 
+' DCS-Olympiev Jan 9, 2019
+' *********************************************************************************
+Function getJavaVersion As String
+	On Error GoTo ErrH
+
+	Dim version As String
+
+	Dim jSession As JavaSession
+	Dim jError As JavaError
+	Dim jClass As JavaClass
+	Dim jObject As JavaObject
+	
+	Set jSession = New JavaSession
+	Set jClass = jSession.GetClass("TestObject")
+	Set jObject = jClass.CreateObject()
+	
+	version = jObject.getJavaVersion()
+	getJavaVersion = version
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+End Function
+
+'++LotusScript Development Environment:2:1:getSystemPath:5:8
+' Library LS2JJavaTestLib -> Sub geSystemPath
+' 
+' DCS-Olympiev Dec 25, 2018
+' *********************************************************************************
+Function getSystemPath As String 
+	Const FuncName = {geSystemPath}
+	On Error GoTo ErrH
+
+Dim path As String
+
+	Dim jSession As JavaSession
+	Dim jError As JavaError
+	Dim jClass As JavaClass
+	Dim jObject As JavaObject
+	
+	Set jSession = New JavaSession
+	Set jClass = jSession.GetClass("TestObject")
+	Set jObject = jClass.CreateObject()
+	
+	path = jObject.getSystemPath()
+	getSystemPath = path
+	
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & funcName & ", c. " & CStr(ErL) & nLine & Error$
+	Resume EndH
+EndH:
+End Function
+

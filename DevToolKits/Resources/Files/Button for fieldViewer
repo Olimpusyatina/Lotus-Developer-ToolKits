@@ -1,0 +1,4 @@
+@Environment("tserver"; @Text(@ServerName));
+@Environment("tdb"; @Subset(@DbName; -1));
+@Environment("tunid"; @Text(@DocumentUniqueID));
+@Command([Compose]; "MSK-LotusTask/OTTO/RU" : "System\\devToolKits.nsf"; "fieldViewer")

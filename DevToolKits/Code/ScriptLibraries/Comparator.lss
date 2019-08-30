@@ -1,0 +1,693 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+'********************************************
+'Library Comparator
+'DCS-Olympiev: May 29, 2019
+'********************************************
+Option Public
+Option Declare
+Use "ScriptLibrary"
+Use "ls.snapps.JSONWriter"
+Use "ls.snapps.JSONReader"
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Class Comparator
+Declare Sub Initialize
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+Private nLine As String
+Private Const designElem = "Comparator"
+
+Private writer As JSONWriter
+'********************************************
+'Class Comparator
+'DCS-Olympiev: May 27, 2019
+'********************************************
+Class Comparator
+	Private sl1 As ScriptLibrary
+	Private sl2 As ScriptLibrary
+	Private result As Boolean
+	Private jsonResult As String
+	Sub New ()
+		On Error GoTo ErrH
+
+		Set Me.sl1 = Nothing
+		Set me.sl2 = Nothing
+		
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Sub
+
+	'********************************************
+	'Function run
+	'Boolean
+	'DCS-Olympiev: May 27, 2019
+	'********************************************
+	Function run (sl1 As ScriptLibrary, sl2 As ScriptLibrary) As Boolean
+		On Error GoTo ErrH
+		
+		Dim sResult As String
+		Dim tmpResult As String
+		
+		Set Me.sl1 = sl1
+		Set Me.sl2 = sl2
+		Set writer = New JSONWriter
+		
+		result = True
+		sResult = writer.BeginObject()
+	
+		sResult = sResult & writer.Key(Me.sl1.getName())
+		sResult = sResult & writer.AppendValue(Me.sl2.getName())
+		sResult = sResult & writer.Key("Comparator")
+
+		tmpResult = compareOptionsExt()
+		tmpResult = tmpResult & compareLinkedLibsExt()
+		tmpResult = tmpResult & compareDeclaredFunctionsExt()
+		tmpResult = tmpResult & compareConstantsExt()
+		tmpResult = tmpResult & compareVariables(sl1.getVariables, sl2.getVariables)
+		tmpResult = tmpResult & compareUserTypesExt()
+		tmpResult = tmpResult & compareUserClassesExt()
+		tmpResult = tmpResult & compareMethodsExt(sl1.getMethods(), sl2.getMethods())
+		
+		If tmpResult = "" Then
+			sResult = sResult & writer.AppendValue("SUCCESS")
+		Else
+			sResult = sResult & writer.BeginObject()			
+			sResult = sResult & tmpResult
+			sResult = sResult & writer.EndObject()
+		End If
+
+		sResult = sResult & writer.EndObject()
+		jsonResult = sResult
+		run = result
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function result
+	'Boolean
+	'DCS-Olympiev: May 27, 2019
+	'********************************************
+	Function getResult As Boolean
+		On Error GoTo ErrH
+
+		getResult = result
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function description
+	'String
+	'DCS-Olympiev: May 27, 2019
+	'********************************************
+	Function getResultJSON As JSONObject
+		On Error GoTo ErrH
+		
+		Dim JSONObj As JSONObject
+		Dim JSONReader As New JSONReader
+		Set JSONObj = JSONReader.Parse(jsonResult)
+		Set getResultJSON = JSONObj
+		
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function getResultString
+	'String
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Function getResultString As String
+	On Error GoTo ErrH
+
+		getResultString = jsonResult
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareOptions
+	'Boolean
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Function compareOptions(sl1 As ScriptLibrary, sl2 As ScriptLibrary) As Boolean
+	On Error GoTo ErrH
+		
+		Dim sResult As String
+		
+		Set Me.sl1 = sl1
+		Set Me.sl2 = sl2
+		Set writer = New JSONWriter
+		result = True
+
+		sResult = writer.BeginObject()
+		sResult = sResult & writer.Key("Options")
+		sResult = writer.BeginObject()
+		sResult = sResult & compareOptionsExt()
+		sResult = sResult & writer.EndObject()
+		compareOptions = result
+	
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareLinkLibs
+	'DCS-Olympiev: May 27, 2019
+	'********************************************
+	Private Function compareOptionsExt() As String
+		On Error GoTo ErrH
+		
+		
+		Dim sResult As String
+		Dim options1 As Variant
+		Dim options2 As Variant
+		Dim options As Variant
+		
+		Dim res As String
+		options1 = sl1.getOptions()
+		options2 = sl2.getOptions()
+
+		options = ArrayAppend(options1, options2)
+		options = FullTrim(ArrayUnique(options))		
+		ForAll optionVal In options
+			If IsNull(ArrayGetIndex(options1, optionVal)) Then  res = res & addBlock(CStr(optionVal), False, True)
+			If IsNull(ArrayGetIndex(options2, optionVal)) Then  res = res & addBlock(CStr(optionVal), True, False)
+		End ForAll
+		
+		If res <> "" Then
+			sResult = sResult & writer.Key("Options")
+			sResult = sResult & writer.BeginObject()			
+			sResult = sResult & res
+			sResult = sResult & writer.EndObject()			
+		End If
+
+		compareOptionsExt = sResult
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareLinkedLibs
+	'Boolean
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Function compareLinkedLibs (sl1 As ScriptLibrary, sl2 As ScriptLibrary) As Boolean
+	On Error GoTo ErrH
+
+		Dim sResult As String
+		Set Me.sl1 = sl1
+		Set Me.sl2 = sl2
+		Set writer = New JSONWriter
+		
+		result = True
+
+		sResult = writer.BeginObject()
+		sResult = sResult & writer.Key("Linked Links")
+		sResult = writer.BeginObject()
+		sResult = sResult & compareLinkedLibsExt()
+		sResult = sResult & writer.EndObject()
+		compareLinkedLibs = result
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareLinkedLibs
+	'DCS-Olympiev: May 27, 2019
+	'********************************************
+	Private Function compareLinkedLibsExt() As String
+		On Error GoTo ErrH
+		
+		Dim sResult As String
+		Dim linkedLibs1 As Variant
+		Dim linkedLibs2 As Variant
+		Dim linkedLibs As Variant
+		Dim res As String
+		
+		linkedLibs1 = sl1.getLinkLibs()
+		linkedLibs2 = sl2.getLinkLibs()
+		
+		linkedLibs = ArrayAppend(linkedLibs1, linkedLibs2)
+		linkedLibs = FullTrim(ArrayUnique(linkedLibs))		
+		ForAll linkedLib In linkedLibs
+			If IsNull(ArrayGetIndex(linkedLibs1, linkedLib)) Then res = res & addBlock(Replace(CStr(linkedLib), {"}, ""), False, True)
+			If IsNull(ArrayGetIndex(linkedLibs2, linkedLib)) Then res = res & addBlock(Replace(CStr(linkedLib), {"}, ""), True, False)
+		End ForAll
+
+		If res <> "" Then
+			sResult = sResult & writer.Key("Linked Libraries")
+			sResult = sResult & writer.BeginObject()
+			sResult = sResult & res
+			sResult = sResult & writer.EndObject()
+		End If
+	
+		compareLinkedLibsExt = sResult
+				
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareDeclaredFunctions
+	'Boolean
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Function compareDeclaredFunctions (sl1 As ScriptLibrary, sl2 As ScriptLibrary) As Boolean
+	On Error GoTo ErrH
+
+		Dim sResult As String
+		Set Me.sl1 = sl1
+		Set Me.sl2 = sl2
+		Set writer = New JSONWriter
+		
+		result = True
+
+		sResult = writer.BeginObject()
+		sResult = sResult & writer.Key("Declared Functions")
+		sResult = writer.BeginObject()
+		sResult = sResult & compareLinkedLibsExt()
+		sResult = sResult & writer.EndObject()
+		compareDeclaredFunctions = result
+		
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareDeclaredFunctionsExt
+	'DCS-Olympiev: May 27, 2019
+	'********************************************
+	Private Function compareDeclaredFunctionsExt() As String
+	On Error GoTo ErrH
+	
+		Dim res As String
+		Dim declaredFunctions As New ObjectCollection
+		Dim func As DeclaredFunction
+		Dim func1 As DeclaredFunction
+		Dim func2 As DeclaredFunction
+		Dim fullRes As String
+		
+		Call declaredFunctions.addObjectCollection(sl1.getDeclaredFunctions())
+		Call declaredFunctions.addObjectCollection(sl2.getDeclaredFunctions())
+		Call declaredFunctions.unique()
+		Set func = declaredFunctions.getFirstObject()
+		While Not func Is Nothing
+			res = ""
+			Set func1 = sl1.getDeclaredFunctions().getObjectByKey(func.getKey())
+			If func1 Is Nothing Then
+				fullRes = fullRes & addBlock(func.getName(), False, True)
+				GoTo nextFunction
+			End If
+			Set func2 = sl2.getDeclaredFunctions().getObjectByKey(func.getKey())
+			If func2 Is Nothing Then
+				fullRes = fullRes & addBlock(func.getName(), True, False)
+				GoTo nextFunction
+			End If
+
+			If func1.getAlias() <> func2.getAlias() Then res = res & addBlock("Alias", func1.getAlias(), func2.getAlias())
+			If func1.getLibName() <> func2.getLibName() Then res = res & addBlock("Library Name", func1.getLibName(), func2.getLibName())			
+			res = compareMethodExt(func1, func2)
+			If res <> "" Then
+				fullRes =  writer.Key(func.getName()) & writer.BeginObject() & res & writer.EndObject()
+			End If
+nextFunction:
+			Set func = declaredFunctions.getNextObject()
+		Wend
+		
+		Dim sResult As String
+		If fullres <> "" Then
+			sResult = sResult & writer.Key("Declared Functions")
+			sResult = sResult & writer.BeginObject()
+			sResult = sResult & fullRes
+			sResult = sResult & writer.EndObject()		
+		End If
+		
+		compareDeclaredFunctionsExt = sResult
+		
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareMethod
+	'Boolean
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Private Function compareMethodExt(method1 As Method, method2 As Method) As String
+		On Error GoTo ErrH
+				
+		Dim res As String
+		Dim var1 As Variable
+		Dim var2 As Variable
+				
+		If method1.getAccessModifier() <> method2.getAccessModifier() Then res = res & addBlock("Access modifier", method1.getAccessModifier(), method2.getAccessModifier()) 
+		If method1.getType() <> method2.getType() Then res = res & addBlock("Type", method1.getType(), method2.getType())
+		If 	Not method1.getReturnValue() Is Nothing And Not method2.getReturnValue() Is Nothing  Then If method1.getReturnValue().getType <> method2.getReturnValue().getType() Then res = res & addBlock("Return Value", method1.getReturnValue().getType(), method2.getReturnValue().getType())			
+	
+		res = res & compareVariables(method1.getArguments(), method2.getArguments())
+		compareMethodExt = res
+					
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareUserTypesExt
+	'DCS-Olympiev: May 27, 2019
+	'********************************************
+	Private Function compareUserTypesExt() As String
+	On Error GoTo ErrH
+	
+		Dim sResult As String		
+		Dim userTypes As New ObjectCollection
+		Dim userType1 As userType
+		Dim userType2 As userType
+		Dim userType As userType
+		Dim res As String
+		Dim fullRes As String
+		
+		Call userTypes.addObjectCollection(sl1.getTypes())
+		Call userTypes.addObjectCollection(sl2.getTypes())
+		Call userTypes.unique()
+		Set userType = userTypes.getFirstObject()
+		While Not userType Is Nothing
+			res = ""
+			Set userType1 = sl1.getTypes().getObjectByKey(userType.getKey())
+			If userType1 Is Nothing Then
+				fullRes = fullRes & addBlock(userType.getName(), False, True)
+				GoTo nextUserType
+			End If
+			Set userType2 = sl2.getTypes().getObjectByKey(userType.getKey())
+			If userType2 Is Nothing Then
+				fullRes = fullRes & addBlock(userType.getName(), True, False)
+				GoTo nextUserType
+			End If
+
+			res = res & compareVariables(userType1.getVariables(), userType2.getVariables())
+			
+			If res <> "" Then
+				fullRes = writer.Key(userType.getName()) & writer.BeginObject() & res & writer.EndObject()
+			End If
+nextUserType:
+			Set userType = userTypes.getNextObject()
+		Wend
+		
+		If fullRes <> "" Then
+			sResult = sResult & writer.Key("User Types")
+			sResult = sResult & writer.BeginObject()
+			sResult = sResult & fullRes
+			sResult = sResult & writer.EndObject()		
+		End If
+
+		compareUserTypesExt = sResult
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareConstantsExt
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Private Function compareConstantsExt() As String
+	On Error GoTo ErrH
+	
+	
+		Dim res As String
+		Dim fullRes As String
+		Dim sResult As String
+		Dim constants As New ObjectCollection
+		Dim constant As Constant
+		Dim constant1 As Constant
+		Dim constant2 As Constant
+		
+		Call constants.addObjectCollection(sl1.getConstants())
+		Call constants.addObjectCollection(sl2.getConstants())
+		Call constants.unique()
+		
+		Set constant = constants.getFirstObject()
+		While Not constant Is Nothing
+			res = ""
+			Set constant1 = sl1.getConstants().getObjectByKey(constant.getKey())
+			If constant1 Is Nothing Then
+				fullRes = fullRes & addBlock(constant.getName(), False, True)
+				GoTo nextConstant
+			End If
+			Set constant2 = sl2.getConstants().getObjectByKey(constant.getKey())
+			If constant2 Is Nothing Then
+				fullRes = fullRes & addBlock(constant.getName(), True, False)
+				GoTo nextConstant
+			End If
+			
+			If constant1.getValue() <> constant2.getValue() Then res = res & addBlock(constant1.getName(), constant1.getValue(), constant2.getValue())
+			res = res & compareVariableExt(constant1, constant2)
+			If res <> "" Then
+				fullRes = writer.Key(constant.getName()) & writer.BeginObject() & res & writer.EndObject()
+			End If
+nextConstant:
+			Set constant = constants.getNextObject()
+		Wend
+	
+		If fullRes <> "" Then
+			sResult = sResult & writer.Key("Constants")
+			sResult = sResult & writer.BeginObject()
+			sResult = sResult & fullRes
+			sResult = sResult & writer.EndObject()		
+		End If
+	
+		compareConstantsExt = sResult
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareUserClassesExt
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Private Function compareUserClassesExt() As String
+	On Error GoTo ErrH
+				
+		Dim userClass As userClass
+		Dim userClass1 As userClass
+		Dim userClass2 As userClass
+		Dim userClasses As New ObjectCollection
+		Dim res As String
+		Dim fullRes As String
+		Dim sResult As String
+		
+		Call userClasses.addObjectCollection(sl1.getClasses())
+		Call userClasses.addObjectCollection(sl2.getClasses())
+		Call userClasses.unique()
+		Set userClass = userClasses.getFirstObject()
+		While Not userClass Is Nothing
+			res = ""
+			Set userClass1 = sl1.getClasses().getObjectByKey(userClass.getKey())
+			If userClass1 Is Nothing Then
+				fullRes = fullRes & addBlock(userClass.getName(), False, True)
+				GoTo nextUserClass
+			End If
+			Set userClass2 = sl2.getClasses().getObjectByKey(userClass.getKey())
+			If userClass2 Is Nothing Then
+				fullRes = fullRes & addBlock(userClass.getName(), True, False)
+				GoTo nextUserClass
+			End If
+		
+			If userClass1.getAccessModifier() <> userClass2.getAccessModifier() Then res = res & addBlock (userClass1.getName & (" access modifier"), userClass1.getAccessModifier(), userClass2.getAccessModifier())
+			res = res & compareMethodsExt(userClass1.getMethods(), userClass2.getMethods())
+			res = res & compareVariables(userClass1.getFields(), userClass2.getFields())
+			If res <> "" Then
+				fullRes = writer.Key(userClass.getName()) & writer.BeginObject() & res & writer.EndObject()
+			End If
+nextUserClass:
+			Set userClass = userClasses.getNextObject()
+		Wend
+		
+		If fullRes <> "" Then
+			sResult = sResult & writer.Key("User Classes")
+			sResult = sResult & writer.BeginObject()
+			sResult = sResult & fullRes
+			sResult = sResult & writer.EndObject()		
+		End If
+		compareUserClassesExt = sResult
+		
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareMethodsExt
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Private Function compareMethodsExt(methods1 As ObjectCollection, methods2 As ObjectCollection) As String
+	On Error GoTo ErrH
+		
+		Dim method As method
+		Dim method1 As method
+		Dim method2 As method
+		Dim methods As New ObjectCollection
+		Dim res As String
+		Dim fullRes As String
+		Dim sResult As String
+		
+		Call methods.addObjectCollection(methods1)
+		Call methods.addObjectCollection(methods2)
+		Call methods.unique()
+		Set method = methods.getFirstObject()
+		While Not method Is Nothing
+			res = ""
+			Set method1 = methods1.getObjectByKey(method.getKey())
+			If method1 Is Nothing Then
+				fullRes = fullRes & addBlock(method.getName(), False, True)
+				GoTo nextmethod
+			End If
+			Set method2 = methods2.getObjectByKey(method.getKey())
+			If method2 Is Nothing Then
+				fullRes = fullRes & addBlock(method.getName(), True, False)
+				GoTo nextmethod
+			End If
+		
+'			If userClass1.getAccessModifier() <> userClass2.getAccessModifier() Then res = res And addBlock (userClass1.getName & (" access modifier"), userClass1.getAccessModifier(), userClass2.getAccessModifier())
+			res = res & compareMethodExt(method1, method2)
+			If res <> "" Then
+				fullRes = writer.Key(method.getName()) & writer.BeginObject() & res & writer.EndObject()
+			End If
+nextmethod:
+			Set method = methods.getNextObject()
+		Wend
+		
+		If fullRes <> "" Then
+			sResult = sResult & writer.Key("Methods")
+			sResult = sResult & writer.BeginObject()
+			sResult = sResult & fullRes
+			sResult = sResult & writer.EndObject()		
+		End If
+		compareMethodsExt = sResult
+		
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareVariables
+	'Boolean
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Function compareVariables (vars1 As ObjectCollection, vars2 As ObjectCollection) As String
+	On Error GoTo ErrH
+	
+		Dim res As String
+		Dim vars As New ObjectCollection
+		Dim var As Variable
+		Dim var1 As Variable
+		Dim var2 As Variable
+		
+		Call vars.addObjectCollection(vars1)
+		Call vars.addObjectCollection(vars2)
+		Call vars.unique()
+		
+		Set var = vars.getFirstObject()
+		While Not var Is Nothing
+			Set var1 = vars1.getObjectByKey(var.getKey())
+			If var1 Is Nothing Then
+				res = res & addBlock(var.getName(), False, True)
+				GoTo nextVar
+			End If
+			Set var2 = vars2.getObjectByKey(var.getKey())
+			If var2 Is Nothing Then
+				res = res & addBlock(var.getName(), True, False)
+				GoTo nextVar
+			End If
+			res = res & compareVariableExt(Var1, Var2)
+			
+nextVar:
+			Set var = vars.getNextObject()
+		Wend
+	
+		compareVariables = res
+	
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function compareVariable
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Private Function compareVariableExt(var1 As Variable, var2 As Variable)  As String
+	On Error GoTo ErrH
+	
+	Dim res As String
+
+	If var1.getAccessModifier() <> var2.getAccessModifier() Then res = res & addBlock (var1.getName & (" access modifier"), var1.getAccessModifier(), var2.getAccessModifier())
+	If var1.getType <> var2.getType() Then res = res & addBlock (var1.getName & (" Type"), var1.getType(), var2.getType())
+	
+	compareVariableExt = res
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Sub addLeaf
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Function addBlock (value As String, one As Variant, two As Variant) As String
+	On Error GoTo ErrH
+	
+		Dim sResult As String
+		sResult = sResult & writer.Key(value)
+		sResult = sResult & writer.BeginObject()
+		sResult = sResult & writer.Key("1")
+		sResult = sResult & writer.AppendValue(one)
+		sResult = sResult & writer.Key("2")
+		sResult = sResult & writer.AppendValue(two)
+		sResult = sResult & writer.EndObject()
+		addBlock = StrRight(sResult, ",")
+		
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+End Class
+'++LotusScript Development Environment:2:2:Initialize:2:10
+
+Sub Initialize
+	On Error GoTo ErrH
+	nLine = Chr(10) & Chr(13)
+
+
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+	Resume endH
+EndH:
+End Sub
+
+

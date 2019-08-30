@@ -1,0 +1,4 @@
+@SetEnvironment("EXECUTOR_SCRIPT_DOCUMENT_UNID";@Text(@DocumentUniqueID));
+@SetEnvironment("EXECUTOR_SCRIPT_DATABASE_SERVER";@Text(@ServerName));
+@SetEnvironment("EXECUTOR_SCRIPT_DATABASE_PATH";@Subset(@DbName; -1));
+@Command([Compose]; "MSK-LotusTask/OTTO/RU" : "System\\devToolKits.nsf"; "preOpenExecutor")

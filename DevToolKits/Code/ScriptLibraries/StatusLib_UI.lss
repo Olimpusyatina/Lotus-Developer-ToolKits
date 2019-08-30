@@ -1,0 +1,84 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+%REM
+	Library StatusLib_UI
+	Created Aug 1, 2017 by Alexandr S. Olympiev/OTTO/RU
+	Description: UI оболочка для Статусов
+	test of sign
+%END REM
+Option Public
+Option Declare
+
+Use "StatusLib"
+Use "WindowLib"
+ 
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Class StatusUI As Status
+Declare Sub Initialize
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+Const LibName = "StatusLib_UI"
+
+Private nLine As String
+
+Class StatusUI As Status
+	Sub New (mdoc As Variant, FieldName As String)	
+	End Sub
+	
+	Function SelectStatus As String
+		On Error GoTo ErrH
+		fName = "Status -> SelectStatus"
+		
+		Dim ws As New NotesUIWorkspace
+		Dim doc As NotesDocument
+		Set doc = ws.CurrentDocument.Document
+		Dim nsNames As Variant
+		Dim selected As String, statusNumber
+		
+		nsNames = Me.GetNextStatusNames
+		
+		If nsNAmes(0) = "" Then 
+			MsgBox "Уважаемый коллега, изменение статуса не возможно."
+			GoTo EndH
+		End If
+		Dim menu As New popUpMenu
+		ForAll names In NSNames
+			Call menu.appendItem(names)
+		End ForAll
+		
+		selected = menu.Show
+		If CStr(selected) = "" Then GoTo EndH
+		statusNumber = Me.GetNextStatusCodeByName(CStr(selected))
+		If Me.MoveToStatus(CStr(statusNumber)) Then
+			ws.Currentdocument.Document.Replaceitemvalue("SaveOptions", "2").Savetodisk = False
+			Call ws.CurrentDocument.Close
+			Call ws.ViewRefresh
+		End if
+		GoTo EndH 
+ErrH:
+		errS = libName & ", " & fName & ": " & Err &", в стр " & Erl & nLine & Error$
+		Error Err, errS
+EndH:	
+	End Function
+End Class
+'++LotusScript Development Environment:2:2:Initialize:1:10
+Sub Initialize
+	On Error GoTo errH
+	fName = "Status.Initialize"
+	
+	nLine = Chr(10) & Chr(13)
+	Set dbS = DBT_GetDbBySearchKey("STATUSES")
+	movingCounter = 0
+	GoTo fn
+errH:
+	errS = libName & ", " & fName & ": " & Err &", в стр " & Erl & nLine & Error$
+	Error Err, errS
+fn:
+End Sub
+
+
+
+
+
+
+

@@ -1,0 +1,1604 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+%REM
+	Library ScriptLibrary
+	Created Apr 8, 2019 by Alexandr S. Olympiev/OTTO/RU
+	Description: Comments for Library
+%END REM
+Option Public
+Option Declare
+
+Use "Collections"
+
+
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Class ScriptLibrary As Interface
+Declare Class Method As Interface
+Declare Class Variable As Interface
+Declare Class userClass As Interface
+Declare Class Constant As Variable
+Declare Class DeclaredFunction As Method
+Declare Class userType As Interface
+Declare Sub Initialize
+Declare Function SL_clearScript (textArr As String) As String
+Declare Function SL_inString (str1 As String, str2 As String) As Boolean
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+Private Const DesignElem = {ScriptLibrary}
+Private nLine As String
+
+Private Const VERSION_TAG = {|v.}
+
+Private Const LIB_NAME = "$TITLE"
+Private Const LIB_DEFAULT_VERSION = "v1.0.0.0"
+
+Private Const EVENT_NODE_NAME = "event"
+Private Const EVENT_OPTIONS = "options"
+Private Const EVENT_DECLARETIONS = "declarations"
+
+Private Const PRIVATE_MODIFIER = "Private"
+Private Const PUBLIC_MODIFIER = "Public"
+Private Const STATIC_MODIFIER = "Static"
+Private Const DIM_MODIFIER = "Dim"
+Private Const BYVAL_MODIFIER = "ByVal"
+
+Private Const SUB_METHOD = "Sub "
+Private Const FUNCTION_METHOD = "Function "
+Private Const PROPERTYGET_METHOD = "Property get"
+Private Const PROPERTYSET_METHOD = "Property set"
+Private Const PROPERTY_METHOD = "Property"
+
+Private Const TAG_CONST = "Const "
+Private Const TAG_DECLARE_FUNCTION = "Declare "
+Private Const TAG_DECLARE_LIB = "lib"
+Private Const TAG_DECLARE_ALIAS = "alias"
+Private Const TAG_CLASS_START = "Class "
+Private Const TAG_CLASS_END = "End Class"
+Private Const TAG_TYPE_START = "Type "
+Private Const TAG_TYPE_END = "End Type"
+Private Const TAG_SUB_START = "Sub "
+Private Const TAG_SUB_END = "End Sub"
+Private Const TAG_FUNCTION_START = "Function "
+Private Const TAG_FUNCTION_END = "End Function"
+Private Const TAG_PROPERTYSET_START = "Property set "
+Private Const TAG_PROPERTYSET_END = "End property"
+Private Const TAG_PROPERTYGET_START = "Property get "
+Private Const TAG_PROPERTYGET_END = "End property"
+Private Const TAG_OPTION = "Option "
+Private Const TAG_END = "end"
+
+Private Const CONSTANT_VALUE_DELEMITER = "="
+Private Const CONSTANT_TYPE_NUMERIC = "Numeric"
+Private Const CONSTANT_TYPE_STRING = "String"
+
+Private Const VARIABLE_AS_TAG = " As "
+Private Const VARIABLE_DEFAULT_TYPE = "As Variant"
+
+Private Const ARGUMENT_DELEMITER = ","
+Private Const NOT_NEWLINE_DELEMITER = "_"
+
+Private Const COMMENT_SINGLE = {'}
+Private Const COMMENT_START_REM = {%Rem}
+Private Const COMMENT_END_REM = {%End Rem}
+
+Private dom As NotesDOMParser
+Private eventName As String
+Private EOL As String
+
+' Library ScriptLibrary -> Class ScripLibrary
+' 
+' DCS-Olympiev Apr 8, 2019
+' *********************************************************************************
+Class ScriptLibrary As Interface
+	Private libDoc As NotesDocument
+	Private libName As String
+	Private version As String
+
+	Private options() As String	
+	Private linkLibs() As String
+	
+	Private constants As ObjectCollection
+	Private declaredFunctions As ObjectCollection
+	Private methods As ObjectCollection
+	Private userClasses As ObjectCollection
+	Private userTypes As ObjectCollection
+	Private variables As ObjectCollection
+	
+	Sub New (doc As notesdocument)
+		On Error GoTo ErrH
+		
+		Set methods = New ObjectCollection
+		Set declaredFunctions = New ObjectCollection
+		Set constants = New ObjectCollection
+		Set userClasses = New ObjectCollection
+		Set userTypes = New ObjectCollection
+		Set variables = New ObjectCollection
+		ReDim linklibs(0)
+		ReDim options(0)
+		
+		Set libDoc = doc
+		libName = doc.Getitemvalue(LIB_NAME)(0)
+		If SL_inString(libName, VERSION_TAG) Then
+			version = StrRight(libName,VERSION_TAG)
+			libName = StrLeft(libName, VERSION_TAG)
+		Else
+			version = LIB_DEFAULT_VERSION
+		End If
+		
+		Dim s As New NotesSession
+		Dim DXLExporter As NotesDXLExporter
+		
+		Set dom = s.Createdomparser()
+		Set DXLExporter = s.Createdxlexporter(libDoc, dom)
+		Call DXLExporter.Process()
+
+		Dim docNode As NotesDOMDocumentNode			
+
+		Set docNode = dom.Document
+		
+		Call parseLibrary(docNode)
+		
+		GoTo Endh
+ErrH:
+		stop
+		Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub parseLibrary
+	' 
+	' DCS-Olympiev Apr 9, 2019
+	' *********************************************************************************
+	Sub parseLibrary (node As NotesDOMNode)
+		On Error GoTo ErrH
+
+		Dim child As NotesDOMNode
+		Dim elt As NotesDOMNode
+		Dim attrs As NotesDOMNamedNodeMap
+		Dim a As NotesDOMAttributeNode
+		Dim piNode As NotesDOMProcessingInstructionNode
+		
+		If Not node.IsNull Then  
+			Select Case node.NodeType
+			Case DOMNODETYPE_DOCUMENT_NODE:       
+				Set child = node.FirstChild
+				Dim numChildNodes As Integer
+				numChildNodes = node.NumberOfChildNodes				
+				While numChildNodes > 0 
+					Set child = child.NextSibling 
+					numChildNodes = numChildNodes - 1
+					Call parseLibrary(child)
+				Wend
+			Case DOMNODETYPE_TEXT_NODE:           
+				Select Case eventName
+				Case EVENT_OPTIONS
+					Call fillOptions(node.Nodevalue)
+				Case EVENT_DECLARETIONS
+					Call fillDeclarations(node.Nodevalue)
+				Case ""
+				Case else
+					Call fillMethod(eventName, node.Nodevalue)							
+			End Select
+				eventName = ""
+			Case DOMNODETYPE_ELEMENT_NODE:
+				Set elt = node
+				Dim numAttributes As Integer, numChildren As Integer
+				numAttributes = elt.attributes.numberofentries
+				
+				Set attrs = elt.Attributes
+				
+				Dim i As Integer
+				For i = 1 To numAttributes
+					Set a = attrs.GetItem(i)
+					If a.NodeName = EVENT_NODE_NAME Then eventName = a.NodeValue
+				Next
+				
+				numChildren =  elt.NumberOfChildNodes
+				Set child = elt.FirstChild
+				While numChildren > 0
+					Call parseLibrary(child)
+					Set child = child.NextSibling
+					numChildren = numChildren - 1
+				Wend
+		End Select
+		End If
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub fillOptions
+	' 
+	' DCS-Olympiev Apr 9, 2019
+	' *********************************************************************************
+	Private Sub fillOptions(opts As String)
+		On Error GoTo ErrH
+		
+		Dim optionCounter As Integer
+		Dim linkLibsCounter As Integer
+		Dim optionsArr As Variant
+		Dim counter As Integer
+		Dim comment As Boolean
+		
+		optionsArr = Split(SL_clearScript(opts), EOL) 	
+		For counter = 0 To UBound(optionsArr)
+			If SL_inString(optionsArr(counter), TAG_OPTION) Then
+				ReDim Preserve options(optionCounter) As String
+				options(optionCounter) = optionsArr(counter)
+				optionCounter = optionCounter + 1
+			ElseIf optionsArr(counter) <> "" Then
+				ReDim Preserve linkLibs(linkLibsCounter) As String
+				linkLibs(linkLibsCounter) = optionsArr(counter)
+				linkLibsCounter = linkLibsCounter + 1
+			End If			
+		Next
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub fillDeclarations
+	' 
+	' DCS-Olympiev Apr 9, 2019
+	' *********************************************************************************
+	Private Sub fillDeclarations (declaration As String)
+		On Error GoTo ErrH
+
+		Dim decArr As Variant
+		Dim counter As Integer
+		Dim constant As Constant
+		Dim declareFunction As DeclaredFunction
+		Dim variable As Variable
+		Dim userClass As userClass
+		Dim userType As userType
+		Dim blockText As String
+		
+		decArr = Split(SL_clearScript(declaration), EOL)
+		
+		For counter = 0 To UBound(decArr)
+			If SL_inString(decArr(counter), TAG_CONST) Then
+				Set constant = New Constant(decArr(counter))
+				Call constants.addObject(constant) 
+			elseIf SL_inString(decArr(counter), TAG_DECLARE_FUNCTION) Then
+				Set declareFunction = New DeclaredFunction(decArr(Counter))
+				Call declaredFunctions.addObject(declareFunction)
+			ElseIf SL_inString(decArr(counter), TAG_CLASS_START) Then
+				blockText = ""
+				While Not SL_inString(decArr(counter), TAG_CLASS_END) 
+					blockText = blocktext & decArr(counter) & Chr(10)
+					counter = counter + 1
+				Wend
+				blockText = blocktext & decArr(counter)
+				Set userClass = New userClass (blockText)
+				Call userClasses.addObject(userClass)
+			ElseIf SL_inString(decArr(counter),TAG_TYPE_START) Then
+				blockText = ""
+				While Not SL_inString(decArr(counter), TAG_TYPE_END) 
+					blockText = blocktext & decArr(counter) & Chr(10)
+					counter = counter + 1
+				Wend
+				blockText = blocktext & decArr(counter)
+				Set userType = New userType (blockText)
+				Call userTypes.addObject(userType)
+			Else
+				Set variable = New Variable (decArr(counter))
+				Call variables.addObject(variable)
+			End If
+		Next
+		
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$ & nLine & declaration
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub fillMethod
+	' 
+	' DCS-Olympiev Apr 9, 2019
+	' *********************************************************************************
+	Private Sub fillMethod (eventName As String, methodText As String)
+		On Error GoTo ErrH
+
+		Dim meth As New Method (methodText)	
+		Call methods.addObject(meth)
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Function equals
+	' Boolean
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function equals (obj As Variant) As Boolean
+		On Error GoTo ErrH
+
+		If TypeName(obj) <> TypeName(Me) Then GoTo EndH
+		If obj Is Nothing Then GoTo Endh
+	'	If getName <> obj.getName Then GoTo endh
+	'	If getVersion <> obj.getVersion Then GoTo endh
+		
+		Dim var, oVar
+		Set var = getClasses().getFirstObject()
+		While Not var Is Nothing
+			Set oVar = obj.getClasses.getObjectByKey(var.getKey)
+			If oVar Is Nothing Then GoTo Endh
+			If Not var.equals(oVar) Then GoTo EndH
+			Set var = getClasses().getNextObject()
+		Wend
+		
+		Set var = getConstants().getFirstObject()
+		While Not var Is Nothing
+			Set oVar = obj.getConstants.getObjectByKey(var.getKey)
+			If oVar Is Nothing Then GoTo Endh
+			If Not var.equals(oVar) Then GoTo EndH
+			Set var = getConstants().getNextObject()
+		Wend
+		
+		Set var = getDeclaredFunctions().getFirstObject()
+		While Not var Is Nothing
+			Set oVar = obj.getDeclaredFunctions.getObjectByKey(var.getKey)
+			If oVar Is Nothing Then GoTo Endh
+			If Not var.equals(oVar) Then GoTo EndH
+			Set var = getDeclaredFunctions().getNextObject()
+		Wend
+		
+		Set var = getMethods().getFirstObject()
+		While Not var Is Nothing
+			Set oVar = obj.getMethods.getObjectByKey(var.getKey)
+			If oVar Is Nothing Then GoTo Endh
+			If Not var.equals(oVar) Then GoTo EndH
+			Set var = getMethods().getNextObject()
+		Wend
+		
+		Set var = getTypes().getFirstObject()
+		While Not var Is Nothing
+			Set oVar = obj.getTypes.getObjectByKey(var.getKey)
+			If oVar Is Nothing Then GoTo Endh
+			If Not var.equals(oVar) Then GoTo EndH
+			Set var = getTypes().getNextObject()
+		Wend
+
+		ForAll linklib In getlinkLibs
+			If IsNull(ArrayGetIndex(obj.getLinkLibs(), linklib)) Then GoTo endh
+		End ForAll
+		
+		ForAll opt In GetOptions
+			If IsNull(ArrayGetIndex(obj.GetOptions(), opt)) Then GoTo endh
+		End ForAll
+
+		equals = True
+'
+'		equals = getHash = obj.getHash
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getKey
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getKey As String
+		On Error GoTo ErrH
+
+		getKey = "ScriptLibrary " & getName
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getName
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getName As String
+		On Error GoTo ErrH
+
+		getName = libName
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getConstants
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getConstants As ObjectCollection
+		On Error GoTo ErrH
+
+		Set getConstants = constants
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getDeclaredFunctions
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getDeclaredFunctions As ObjectCollection
+		On Error GoTo ErrH
+
+		Set getDeclaredFunctions = declaredFunctions
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getLinkLibs
+	' Variant
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getLinkLibs As Variant
+		On Error GoTo ErrH
+
+		getlinkLibs = linkLibs
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getMethods
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getMethods As ObjectCollection
+		On Error GoTo ErrH
+
+		Set getMethods = methods
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getOptions
+	' Variant
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getOptions As Variant
+		On Error GoTo ErrH
+
+		getOptions = options
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	'********************************************
+	'Function getVariables
+	'Objectcollection
+	'DCS-Olympiev: May 28, 2019
+	'********************************************
+	Function getVariables As ObjectCollection
+	On Error GoTo ErrH
+
+	Set getVariables = variables
+	
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(Erl) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getClasses
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getClasses As ObjectCollection
+		On Error GoTo ErrH
+
+		Set getClasses = userClasses
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getTypes
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getTypes As ObjectCollection
+		On Error GoTo ErrH
+		
+		Set getTypes = userTypes
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getVersion
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getVersion As String
+		On Error GoTo ErrH
+
+		getVersion = version
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+
+End Class
+
+' Library ScriptLibrary -> Class LibraryElement
+' 
+' DCS-Olympiev Apr 8, 2019
+' *********************************************************************************
+Class Method As Interface
+	Private methodName As String
+	Private methodType As String
+	Private arguments As ObjectCollection
+	Private body As String
+	Private accessModifier As String
+	Private returnValue As Variable
+	Private rows As Integer
+	
+	Sub New (methodText As String)
+		On Error GoTo ErrH
+		
+		Set arguments = New ObjectCollection
+		Call addBody(methodText)
+		Call parseMethod
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub addBody
+	' 
+	' DCS-Olympiev Apr 9, 2019
+	' *********************************************************************************
+	Sub addBody (body As string)
+		On Error GoTo ErrH
+
+		Me.body = SL_clearScript(body)
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub setmethodType
+	' 
+	' DCS-Olympiev Apr 9, 2019
+	' *********************************************************************************
+	Sub setmethodType (methodType As String)
+		On Error GoTo ErrH
+
+		me.methodType = methodType
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub parseMethod
+	' 
+	' DCS-Olympiev Apr 10, 2019
+	' *********************************************************************************
+	Private Sub parseMethod
+		On Error GoTo ErrH
+
+		Dim methArr As Variant
+		Dim rowNumber As Integer
+		Dim comment As Boolean
+		
+		methArr = Split(body, EOL)
+		
+		rows = UBound(metharr) + 1
+		
+		Dim firstRow As String
+		firstRow = methArr(0)
+		
+		If SL_inString(firstRow, PRIVATE_MODIFIER) Then
+			accessModifier = PRIVATE_MODIFIER
+			firstRow = Trim(strRight(firstRow, PRIVATE_MODIFIER))
+		ElseIf SL_inString(firstRow, PUBLIC_MODIFIER) Then
+			accessModifier = PUBLIC_MODIFIER
+			firstRow = Trim(StrRight(firstRow, PUBLIC_MODIFIER))
+		Else
+			accessModifier = PUBLIC_MODIFIER
+		End If
+		
+		If SL_inString(firstRow, SUB_METHOD) Then
+			methodType = SUB_METHOD
+			firstRow = Trim(StrRight(firstRow, SUB_METHOD))
+		ElseIf SL_inString(firstRow, FUNCTION_METHOD) Then
+			methodType = FUNCTION_METHOD
+			firstRow = Trim(StrRight(firstRow, FUNCTION_METHOD))
+		ElseIf SL_inString(firstRow, PROPERTYGET_METHOD) Then
+			methodType = PROPERTYGET_METHOD
+			firstRow = Trim(StrRight(firstRow, PROPERTYGET_METHOD))
+		ElseIf SL_inString(firstRow, PROPERTYSET_METHOD) Then
+			methodType = PROPERTYSET_METHOD
+			firstRow = Trim(StrRight(firstRow, PROPERTYSET_METHOD))
+		End If
+		
+		If SL_inString(firstRow, "(") Then
+			Me.methodName = StrLeft(firstRow, "(")
+		elseIf SL_inString(firstRow, " ") Then
+			Me.methodName = StrLeft(firstRow, " ")
+		Else
+			Me.methodName = firstRow
+		End If
+
+		firstRow = Trim(StrRight(firstRow, Me.methodName))
+		
+		Dim args As String
+		Dim vars As Variant
+		Dim variable As Variable
+		If SL_inString(firstRow, {)}) Then		
+			args = StrLeft(firstRow, {)})
+			firstRow = Trim(StrRight(firstRow, {)}))
+			args = StrRight(args, {(})
+			If args <> "" Then
+				vars = FullTrim(Split(args, ARGUMENT_DELEMITER))
+				ForAll var In vars
+					Set variable = New Variable(CStr(var))
+					Call arguments.addObject(variable)
+				End ForAll
+			End If
+		End If
+		
+		If SL_inString(firstRow, VARIABLE_AS_TAG) Then
+			Set returnValue = New Variable(firstRow)
+		ElseIf methodType <> SUB_METHOD Then
+			Set returnValue = New Variable(VARIABLE_DEFAULT_TYPE)
+		End If
+		
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Function getKey
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getKey As String
+	On Error GoTo ErrH
+
+	getKey = getType & " " & getName()
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getType
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getType As String
+	On Error GoTo ErrH
+
+	getType = methodType
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getName
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getName As String
+	On Error GoTo ErrH
+
+	getName = methodName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getAccessModifier
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getAccessModifier As String
+	On Error GoTo ErrH
+
+	getAccessModifier = accessModifier
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getArguments
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getArguments As ObjectCollection
+	On Error GoTo ErrH
+
+Set getArguments = arguments
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getBody
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getBody As String
+	On Error GoTo ErrH
+
+getBody = body
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getReturnValue
+	' Variable
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getReturnValue As Variable
+	On Error GoTo ErrH
+
+	Set getReturnValue = returnValue
+	
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getRows
+	' Integer
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getRows As Integer
+	On Error GoTo ErrH
+
+	getRows = Rows
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function equals
+	' Boolean
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function equals (obj As Variant) As Boolean
+	On Error GoTo ErrH
+
+		If TypeName(obj) <> TypeName(Me) And TypeName(obj) <> "DECLAREDFUNCTION" Then GoTo Endh
+		If obj Is Nothing Then GoTo EndH
+		If getRows <> obj.GetRows Then GoTo EndH
+		If getName <> obj.getName Then GoTo EndH
+		If getType <> obj.getType Then goto Endh
+		If getAccessModifier <> obj.getAccessModifier Then GoTo EndH
+		If getBody <> obj.getBody Then GoTo EndH
+		If Not getReturnValue() Is Nothing Then If Not getReturnValue().equals(obj.getReturnValue) Then GoTo ENdh
+		
+		Dim var, oVar
+		Set var = getArguments().getFirstObject()
+		While Not var Is Nothing 
+			Set oVar = obj.getArguments().getObjectByKey(var.getKey)
+			If oVar Is Nothing Then GoTo endH
+			If Not var.equals(oVar) Then GoTo EndH
+			Set var = getArguments().getNextObject()
+		Wend
+		equals = true
+'		equals = getHash = obj.getHash
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+
+End Class
+
+' Library ScriptLibrary -> Class variable
+' 
+' DCS-Olympiev Apr 8, 2019
+' *********************************************************************************
+Class Variable As Interface
+	Private variableName As String
+	Private variableType As String
+	Private accessModifier As String
+
+	Sub New (varText As String)
+		On Error GoTo ErrH
+	
+		Dim str1 As String
+		str1 = varText
+		
+		If SL_inString(str1, PRIVATE_MODIFIER) Then
+			accessModifier = PRIVATE_MODIFIER
+			str1 = Trim(StrRight(str1, PRIVATE_MODIFIER))
+		ElseIf SL_inString(str1, PUBLIC_MODIFIER) Then
+			accessModifier = PUBLIC_MODIFIER
+			str1 = Trim(StrRight(str1, PUBLIC_MODIFIER))
+		ElseIf SL_inString(str1, STATIC_MODIFIER) Then
+			accessModifier = STATIC_MODIFIER
+			str1 = Trim(StrRight(str1, STATIC_MODIFIER))
+		ElseIf SL_inString(str1, DIM_MODIFIER) Then
+			accessModifier = DIM_MODIFIER
+			str1 = Trim(StrRight(str1, DIM_MODIFIER))
+		ElseIf SL_inString(str1, BYVAL_MODIFIER) Then
+			accessModifier = BYVAL_MODIFIER
+			str1 = Trim(StrRight(str1, BYVAL_MODIFIER))
+		Else
+			accessModifier = PUBLIC_MODIFIER
+		End If
+
+		If SL_inString(str1, VARIABLE_AS_TAG) Then
+			variableName = Trim(StrLeft(UCase(str1), UCase(VARIABLE_AS_TAG)))
+			variableType = Trim(StrRight(UCase(str1), UCase(VARIABLE_AS_TAG)))
+		ElseIf SL_inString(Str1, CONSTANT_VALUE_DELEMITER) Then
+			variableName = Trim(StrLeft(StrRight(str1,TAG_CONST), CONSTANT_VALUE_DELEMITER))
+		End If
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Property Set setVariableType
+	' Variant
+	' DCS-Olympiev Apr 10, 2019
+	' *********************************************************************************
+	Public Property set setVariableType
+		On Error GoTo ErrH
+
+		Me.variableType = setVariableType
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Property
+	' Library ScriptLibrary -> Function equals
+	' Boolean
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function equals (obj As Variant) As Boolean
+	On Error GoTo ErrH
+
+		If TypeName(obj) <> TypeName(Me) AND TypeName(obj) <> "CONSTANT" Then GoTo EndH
+		If obj Is Nothing Then GoTo endh
+		If obj.getAccessModifier() <> getAccessModifier() Then GoTo endh
+		If obj.getName() <> getName() Then GoTo EndH
+		If obj.getType() <> getType() Then GoTo EndH
+	
+		equals = true
+'		equals = getHash = obj.getHash
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getAccessModifier
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getAccessModifier As String
+	On Error GoTo ErrH
+
+		getAccessModifier = accessModifier
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getType
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getType As String
+	On Error GoTo ErrH
+
+		getType = variableType
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getName
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getName As String
+	On Error GoTo ErrH
+
+	getName = variableName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getKey
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getKey As String
+	On Error GoTo ErrH
+
+	getKey = "Variable " & getName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+
+End Class
+
+' Library ScriptLibrary -> Class userClass
+' 
+' DCS-Olympiev Apr 9, 2019
+' *********************************************************************************
+Class userClass As Interface
+	Private userClassName As String
+	Private parentClassName As String
+	Private fields As ObjectCollection
+	Private methods As ObjectCollection
+	Private accessModifier As String
+	
+	Sub New (body As String)
+		On Error GoTo ErrH
+	
+		Set methods = New ObjectCollection
+		Set fields = New ObjectCollection
+
+		Dim arrText As Variant
+		Dim counter As Integer
+		Dim methodText As String
+		Dim method As Method
+		Dim Field As Variable
+		Dim firstRow As String
+		
+		arrText = Split(SL_clearScript(body), EOL)
+
+		Call getClassInfo(arrText(0))
+		
+		For counter = 1 To UBound(arrText)
+			If SL_inString(arrtext(counter), TAG_FUNCTION_START) Then
+				methodText = ""
+				While not SL_inString(arrtext(counter), TAG_FUNCTION_END)
+					methodText = methodText & arrtext(counter) & Chr(10)
+					counter = counter + 1
+				Wend
+				methodText = methodText & arrtext(counter)
+				Set method = New Method(methodText)
+				Call methods.addObject(method)
+			elseIf SL_inString(arrtext(counter), TAG_SUB_START) Then
+				methodText = ""
+				While Not SL_inString(arrtext(counter), TAG_SUB_END)
+					methodText = methodText & arrtext(counter) & Chr(10)
+					counter = counter + 1
+				Wend
+				methodText = methodText & arrtext(counter)
+				Set method = New Method(methodText)
+				Call methods.addObject(method)
+			ElseIf SL_inString(arrtext(counter), TAG_PROPERTYGET_START) Then
+				methodText = ""
+				While Not SL_inString(arrtext(counter), TAG_PROPERTYGET_END)
+					methodText = methodText & arrtext(counter) & Chr(10)
+					counter = counter + 1
+				Wend
+				methodText = methodText & arrtext(counter)
+				Set method = New Method(methodText)
+				Call methods.addObject(method)
+			ElseIf SL_inString(arrtext(counter), TAG_PROPERTYSET_START) Then
+				methodText = ""
+				While Not SL_inString(arrtext(counter), TAG_PROPERTYSET_END)
+					methodText = methodText & arrtext(counter) & Chr(10)
+					counter = counter + 1
+				Wend
+				methodText = methodText & arrtext(counter)
+				Set method = New Method(methodText)
+				Call methods.addObject(method)
+			ElseIf Not SL_inString(arrText(counter), TAG_CLASS_END) then
+				Set Field = New Variable(arrtext(counter))
+				Call fields.addObject(field)
+			End If	
+		Next
+		
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub getClassInfo
+	' 
+	' DCS-Olympiev Apr 10, 2019
+	' *********************************************************************************
+	Sub getClassInfo (str1 As String)
+	On Error GoTo ErrH
+
+		If SL_inString(str1, PRIVATE_MODIFIER) Then
+			accessModifier = PRIVATE_MODIFIER
+			str1 = Trim(StrRight(str1, PRIVATE_MODIFIER))
+		ElseIf SL_inString(str1, PUBLIC_MODIFIER) Then
+			accessModifier = PUBLIC_MODIFIER
+			str1 = Trim(StrRight(str1, PUBLIC_MODIFIER))
+		ElseIf SL_inString(str1, STATIC_MODIFIER) Then
+			accessModifier = STATIC_MODIFIER
+			str1 = Trim(StrRight(str1, STATIC_MODIFIER))
+		ElseIf SL_inString(str1, DIM_MODIFIER) Then
+			accessModifier = DIM_MODIFIER
+			str1 = Trim(StrRight(str1, DIM_MODIFIER))
+		ElseIf SL_inString(str1, BYVAL_MODIFIER) Then
+			accessModifier = BYVAL_MODIFIER
+			str1 = Trim(StrRight(str1, BYVAL_MODIFIER))
+		Else
+			accessModifier = PUBLIC_MODIFIER
+		End If
+		
+		str1 = StrRight(str1, TAG_CLASS_START)
+		
+		If SL_inString(str1, VARIABLE_AS_TAG) Then
+			userClassName = StrLeft(str1, VARIABLE_AS_TAG)
+			parentClassName = StrRight(str1, VARIABLE_AS_TAG)
+		else
+			userClassName = str1
+		End If
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Function getKey
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getKey As String
+	On Error GoTo ErrH
+
+getKey = "Class " & getName()
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getName
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getName As String
+	On Error GoTo ErrH
+
+getName = userClassName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getParentClassName
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getParentClassName As String
+	On Error GoTo ErrH
+
+getParentClassName = parentClassName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getAccessModifier
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getAccessModifier As String
+	On Error GoTo ErrH
+
+	getAccessModifier = accessModifier
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getFields
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getFields As ObjectCollection
+	On Error GoTo ErrH
+
+	Set getFields = fields
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getMethods
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getMethods As ObjectCollection
+	On Error GoTo ErrH
+
+	Set getMethods = methods
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function equals
+	' Boolean
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function equals (obj As Variant) As Boolean
+	On Error GoTo ErrH
+
+		If obj Is Nothing Then GoTo endH
+		If obj.getName() <> getName Then GoTo endh
+		If obj.getAccessModifier() <> getAccessModifier() Then GoTo EndH
+		If obj.getParentClassName() <> getParentClassName() Then GoTo EndH
+	
+	Dim var As Variant
+	Dim uVar As Variant
+	Set var = getFields().getFirstObject()
+	While Not var Is Nothing
+		Set uVar = obj.getFields().getObjectByKey(var.getKey())
+		If uVar Is Nothing Then GoTo EndH
+		If Not var.equals(uVar) Then GoTo endH
+		Set var = getFields().getNextObject()
+	Wend
+	
+	Set var = getMethods().getFirstObject()
+	While Not var Is Nothing
+		Set uVar = obj.getMethods().getObjectByKey(var.getKey())
+		If uVar Is Nothing Then GoTo EndH
+		If Not var.equals(uVar) Then GoTo endH
+		Set var = getMethods().getNextObject()
+	Wend
+	
+	equals = True
+'
+'		equals = getHash = obj.getHash
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+
+End Class
+' Library ScriptLibrary -> Class Constant
+' 
+' DCS-Olympiev Apr 9, 2019
+' *********************************************************************************
+Class Constant As Variable
+	Private value As String
+	
+	Sub New (varText As String)
+		On Error GoTo ErrH
+
+		value = StrRight(varText, CONSTANT_VALUE_DELEMITER)
+		
+		If IsNumeric(value) Then
+			me.setVariableType = CONSTANT_TYPE_NUMERIC
+		Else
+			me.setVariableType = CONSTANT_TYPE_STRING
+		End If
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Function getValue
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getValue As String
+	On Error GoTo ErrH
+
+	getValue = value
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getKey
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getKey As String
+	On Error GoTo ErrH
+
+	getKey = "Constant " & getName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function equals
+	' Boolean
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function equals (obj As Variant) As Boolean
+	On Error GoTo ErrH
+
+		If TypeName(obj) <> TypeName(Me) Then GoTo Endh
+		If Not Variable..equals(obj) Then GoTo EndH
+		If obj.getValue <> getValue Then GoTo Endh
+	
+	equals = True
+'
+'	equals = getHash = obj.getHash
+	
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+
+End Class
+' Library ScriptLibrary -> Class DeclaredFunction
+' 
+' DCS-Olympiev Apr 9, 2019
+' *********************************************************************************
+Class DeclaredFunction As Method
+	Private libName As String
+	Private aliasName As String
+	
+	Sub New (methodName As String)
+		On Error GoTo ErrH
+
+		libname = StrLeft(StrRight(UCase(methodName), UCase(TAG_DECLARE_LIB)), UCase(TAG_DECLARE_ALIAS))
+		aliasName = StrLeft(StrRight(UCase(methodName), UCase(TAG_DECLARE_ALIAS)), {(})
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Function getLibName
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getLibName As String
+	On Error GoTo ErrH
+
+	getlibName = libName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getAlias
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getAlias As String
+	On Error GoTo ErrH
+
+	getAlias = aliasName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getkey
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getkey As String
+	On Error GoTo ErrH
+
+	getKey = "Declared function " & getName 
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function equals
+	' Boolean
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function equals (obj As Variant) As Boolean
+	On Error GoTo ErrH
+
+	If TypeName(obj) <> TypeName(Me) Then GoTo EndH
+	If Not Method..equals(Obj) Then GoTo endh
+	If getAlias() <> obj.getAlias Then GoTo Endh
+	If getLibName() <> obj.getLibName Then GoTo Endh
+
+	equals = True
+'		equals = getHash = obj.getHash
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+
+End Class
+' Library ScriptLibrary -> Class userType
+' 
+' DCS-Olympiev Apr 10, 2019
+' *********************************************************************************
+Class userType As Interface
+	Private variables As ObjectCollection
+	Private userTypeName As String
+	Private accessModifier As String
+	
+	Sub New (body As String)
+		On Error GoTo ErrH
+
+		Set variables = New ObjectCollection
+
+		Dim arrText As Variant
+		Dim counter As Integer
+		Dim methodText As String
+		Dim method As Method
+		Dim Field As Variable
+		Dim firstRow As String
+		
+		arrText = Split(SL_clearScript(body), EOL)
+
+		Call getTypeInfo(arrText(0))
+		
+		For counter = 1 To UBound(arrText)
+			If Not SL_inString(arrText(counter), TAG_TYPE_END) Then
+				Set Field = New Variable(arrtext(counter))
+				Call variables.addObject(Field)
+			End If	
+		Next
+
+		GoTo EndH
+ErrH:
+		Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Sub getTypeInfo
+	' 
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Sub getTypeInfo(str1 As String)
+	On Error GoTo ErrH
+
+		If SL_inString(str1, PRIVATE_MODIFIER) Then
+			accessModifier = PRIVATE_MODIFIER
+			str1 = Trim(StrRight(str1, PRIVATE_MODIFIER))
+		ElseIf SL_inString(str1, PUBLIC_MODIFIER) Then
+			accessModifier = PUBLIC_MODIFIER
+			str1 = Trim(StrRight(str1, PUBLIC_MODIFIER))
+		ElseIf SL_inString(str1, STATIC_MODIFIER) Then
+			accessModifier = STATIC_MODIFIER
+			str1 = Trim(StrRight(str1, STATIC_MODIFIER))
+		ElseIf SL_inString(str1, DIM_MODIFIER) Then
+			accessModifier = DIM_MODIFIER
+			str1 = Trim(StrRight(str1, DIM_MODIFIER))
+		ElseIf SL_inString(str1, BYVAL_MODIFIER) Then
+			accessModifier = BYVAL_MODIFIER
+			str1 = Trim(StrRight(str1, BYVAL_MODIFIER))
+		Else
+			accessModifier = PUBLIC_MODIFIER
+		End If
+		
+		userTypeName = StrRight(str1, TAG_CLASS_START)
+		
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Sub
+	' Library ScriptLibrary -> Function equals
+	' Boolean
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function equals (obj As Variant) As Boolean
+	On Error GoTo ErrH
+	
+		If TypeName(obj) <> TypeName(Me) Then GoTo EndH
+		If obj Is Nothing Then GoTo endh
+		If obj.getName() <> getName Then GoTo Endh
+		If obj.getAccessModifier() <> getAccessModifier() Then GoTo EndH
+	
+	Dim var As Variable
+	Dim uVar As Variable
+	Set var = getVariables().getFirstObject()
+	While Not var Is Nothing
+		Set uVar = obj.getVariables().getObjectByKey(var.getKey())
+		If uVar Is Nothing Then GoTo Endh
+		If Not var.equals(uVar) Then GoTo Endh
+		Set var = getVariables().getNextObject()
+	Wend
+	
+		equals = true
+'		equals = getHash = obj.getHash
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getKey
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getKey As String
+	On Error GoTo ErrH
+
+	getKey = "Type " & getName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getName
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getName As String
+	On Error GoTo ErrH
+
+	getName = userTypeName
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getVariables
+	' Objectcollection
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getVariables As ObjectCollection
+	On Error GoTo ErrH
+
+		Set getVariables = variables
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+	' Library ScriptLibrary -> Function getAccessModifier
+	' String
+	' DCS-Olympiev Apr 11, 2019
+	' *********************************************************************************
+	Function getAccessModifier As String
+	On Error GoTo ErrH
+
+		getAccessModifier = accessModifier
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & TypeName(Me) & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+	End Function
+
+End Class
+'++LotusScript Development Environment:2:2:Initialize:2:10
+
+Sub Initialize
+	On Error GoTo ErrH
+	
+	EOL = Chr(10)
+	nLine = EOL & Chr(13)
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+End Sub
+
+
+'++LotusScript Development Environment:2:1:SL_clearScript:5:8
+' Library ScriptLibrary -> Function LS_hasComment
+' Boolean
+' DCS-Olympiev Apr 10, 2019
+' *********************************************************************************
+Function SL_clearScript (textArr As String) As String
+	On Error GoTo ErrH
+	
+	Dim startsRem As Boolean
+	Dim comment As Boolean
+	
+	Dim counter As Integer
+	Dim resArr() As String
+	Dim resCounter As Integer
+	Dim arr As Variant
+	Dim addPrevious As Boolean
+	
+	arr = FullTrim(Split(Join(Split(textArr, EOL), Chr(13)),Chr(13)))
+	
+	For counter = 0 To UBound(arr)
+		
+		
+		If SL_inString(arr(counter), COMMENT_SINGLE) Then
+			arr(counter) = StrLeft(arr(counter), COMMENT_SINGLE)
+			If arr(counter) = "" Then arr(counter) = COMMENT_SINGLE
+		End if
+		If SL_inString(arr(counter), COMMENT_END_REM) Then
+			comment = False
+			startsRem = false
+		ElseIf SL_inString(arr(counter), COMMENT_START_REM) Then
+			startsRem = true
+			comment = True
+		ElseIf InStr(arr(counter), COMMENT_SINGLE) = 1 Then
+			comment = True
+		ElseIf Not startsRem Then
+			comment = false
+		End If
+		
+		If Not comment Then
+			If Not SL_inString(arr(counter), COMMENT_END_REM) Then
+				If addPrevious Then
+					resArr(resCounter) = resArr(resCounter) & " " & arr(counter)					
+				Else
+					ReDim Preserve resArr(resCounter) As String
+					resArr(resCounter) = arr(counter)					
+				End If
+				If Right(resArr(resCounter),Len(resArr(resCounter)) - 1) = NOT_NEWLINE_DELEMITER Then
+					addPrevious = True
+				Else
+					addPrevious = False
+					resCounter = resCounter + 1
+				End If
+			End If
+		End If
+	Next
+	If Not IsArray(resArr) Then GoTo Endh	
+	SL_clearScript = Join(resArr, EOL)
+	
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+End Function
+
+
+'++LotusScript Development Environment:2:1:SL_inString:5:8
+' Library ScriptLibrary -> Function inString
+' Boolean
+' DCS-Olympiev Apr 9, 2019
+' *********************************************************************************
+Function SL_inString (str1 As String, str2 As String) As Boolean
+	On Error GoTo ErrH
+
+	If InStr(UCase(str1), UCase(str2)) > 0 Then SL_inString = True
+
+	GoTo EndH
+ErrH:
+	Error Err, DesignElem & " -> " & GetThreadInfo(1) & ", c. " & CStr(ErL) & nLine & Error$
+EndH:
+End Function
+
